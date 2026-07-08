@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: simple-webapp
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            env: prod
+        values:
+          branch: main
+  template:
+    metadata:
+      name: "{{name}}-simple-webapp"
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: ".;.."
+    spec:
+      project: default
+      sources:
+        - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt
+          targetRevision: "{{values.branch}}"
+          path: ./chapter05/chapter-5-the-app-of-apps-approach/app-of-app/simple-webapp
+      destination:
+        name: "{{name}}"
+        namespace: "argocd"
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

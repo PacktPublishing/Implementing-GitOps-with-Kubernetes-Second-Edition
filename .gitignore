@@ -1,0 +1,15 @@
+# Helm
+charts/
+Chart.lock
+
+# Docker
+.DS_Store
+.dockerignore
+docker-compose.yml
+Dockerfile
+
+# Kubernetes
+*.env
+
+# macOS
+.DS_Store
