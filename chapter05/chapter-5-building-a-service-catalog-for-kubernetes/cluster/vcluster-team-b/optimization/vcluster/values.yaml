@@ -10,7 +10,7 @@ vcluster:
       # Replaces the old syncer.extraArgs: [--tls-san=...]; signs the
       # vCluster proxy certificate for the external hostname below.
       extraSANs:
-        - vcluster-a.example.com
+        - vcluster-b.example.com
     # A plain Ingress can't express true SSL passthrough with Traefik, so the
     # control plane's own ingress stays disabled - passthrough is handled by
     # the IngressRouteTCP below instead.
@@ -38,8 +38,8 @@ vcluster:
         count/persistentvolumeclaims: 20
 
 # True SSL passthrough for the vCluster API server via a Traefik IngressRouteTCP.
-# service.name defaults to the release name (vcluster-team-a), matching the
+# service.name defaults to the release name (vcluster-team-b), matching the
 # Service the vcluster subchart creates.
 ingressRouteTCP:
   enabled: true
-  host: vcluster-a.example.com
+  host: vcluster-b.example.com

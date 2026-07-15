@@ -8,12 +8,58 @@ spec:
     - clusters:
         selector:
           matchLabels:
+            env: dev
+        values:
+          branch: main
+    - clusters:
+        selector:
+          matchLabels:
+            env: staging
+        values:
+          branch: main
+    - clusters:
+        selector:
+          matchLabels:
             env: prod
         values:
           branch: main
+  # Progressive syncs: roll out wave by wave (dev -> staging -> prod) instead
+  # of hitting every generated Application at once. matchExpressions select on
+  # the generated Application's own labels, not the cluster secret's, which is
+  # why the env label is propagated below via metadata.labels.
+  # Requires ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_PROGRESSIVE_SYNCS=true on
+  # the controller.
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: env
+              operator: In
+              values: [dev]
+        - matchExpressions:
+            - key: env
+              operator: In
+              values: [staging]
+        - matchExpressions:
+            - key: env
+              operator: In
+              values: [prod]
+          maxUpdate: 25%
+  # Deletion safeguards: if the generator briefly returns fewer clusters (a
+  # removed cluster secret/label, a flaky Git generator listing), don't let
+  # the controller cascade-delete production Applications and their
+  # workloads. applicationsSync: create-update forbids deletion entirely,
+  # leaving removals to an explicit, human-reviewed step. These are set on
+  # the ApplicationSet itself, not on the generated Applications.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    applicationsSync: create-update
   template:
     metadata:
       name: "{{name}}-simple-webapp"
+      labels:
+        env: "{{metadata.labels.env}}"
       annotations:
         argocd.argoproj.io/manifest-generate-paths: ".;.."
     spec:

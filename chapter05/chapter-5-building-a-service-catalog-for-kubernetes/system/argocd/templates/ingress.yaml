@@ -5,13 +5,16 @@ metadata:
   name: argocd-server-ingress
   annotations:
     kubernetes.io/ingress.class: {{ .Values.ingress.className }}
-    ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/ssl-passthrough: {{ .Values.ingress.sslPassthrough | default "false" | quote }}
+    # router.tls terminates TLS at Traefik using the cert-manager-issued
+    # secret below - it is not true SSL passthrough. Plain Ingress
+    # annotations can't express passthrough with Traefik; that needs an
+    # IngressRouteTCP (or a TLSRoute on the Gateway API) instead.
+    traefik.ingress.kubernetes.io/router.tls: {{ .Values.ingress.routerTLS | default "true" | quote }}
     cert-manager.io/cluster-issuer: {{ .Values.ingress.issuer }}
     cert-manager.io/renew-before: 360h #15 days
     cert-manager.io/common-name: {{ .Values.ingress.host }}
     kubernetes.io/tls-acme: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    traefik.ingress.kubernetes.io/service.serversscheme: "https"
 spec:
   rules:
     - host: {{ .Values.ingress.host }}

@@ -1,19 +1,43 @@
+# Migrated to the vCluster v0.35.1 schema: the pre-v0.20 top-level keys
+# (securityContext, fsGroup, isolation.*) were restructured under
+# controlPlane.* and policies.*.
 vcluster:
-  # Resource syncers that should be enabled/disabled.
-  # Enabling syncers will impact RBAC Role and ClusterRole permissions.
-  # To disable a syncer set "enabled: false".
-  # See docs for details - https://www.vcluster.com/docs/architecture/synced-resources
-  # Configure SecurityContext of the containers in the VCluster pod
-  securityContext:
-    runAsUser: 12345
-    runAsGroup: 12345
-    runAsNonRoot: true
+  controlPlane:
+    distro:
+      k8s:
+        enabled: true
+    statefulSet:
+      image:
+        # Stick to the OSS build; "loft-sh/vcluster-pro" is the chart's new
+        # default and includes commercial vCluster Platform modules.
+        repository: "loft-sh/vcluster-oss"
+      security:
+        podSecurityContext:
+          runAsUser: 12345
+          runAsGroup: 12345
+          runAsNonRoot: true
+          fsGroup: 12345
+        containerSecurityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
 
-  # Configure fsGroup
-  # The field is specified, all processes of the container are also part of the supplementary group ID 12345
-  fsGroup: 12345
+  # If enabled will deploy vcluster in an isolated mode with resource quotas
+  # and limit ranges. podSecurityStandard is no longer a chart-level toggle
+  # (removed in the controlPlane/policies rewrite) - enforce it the same way
+  # the native-multitenancy tenants do, via pod-security.kubernetes.io
+  # labels on the tenant namespace itself.
+  policies:
+    resourceQuota:
+      enabled: true
+    limitRange:
+      enabled: true
 
-  # If enabled will deploy vcluster in an isolated mode with pod security
-  # standards, limit ranges and resource quotas
-  isolation:
-    enabled: true
+# Wrapper chart extra (templates/ingressroutetcp.yaml), sibling to the
+# vcluster subchart values above, not nested under it. True SSL passthrough
+# for the vCluster API server via a Traefik-native IngressRouteTCP - disabled
+# by default, enabled per tenant in the cluster-specific override values.
+ingressRouteTCP:
+  enabled: false
+  entryPoints:
+    - websecure
+    - web

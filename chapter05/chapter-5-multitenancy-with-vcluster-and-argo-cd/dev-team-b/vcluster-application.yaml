@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vcluster-team-b
+  namespace: argocd
+spec:
+  destination:
+    name: ""
+    namespace: vcluster-team-b
+    server: "https://kubernetes.default.svc"
+  sources:
+    - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt
+      targetRevision: main
+      ref: valuesRepo
+    # - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt
+    #   path: "./chapter05/chapter-5-building-a-service-catalog-for-kubernetes/cluster/vcluster-team-b/"
+    #   targetRevision: main
+    - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt
+      targetRevision: main
+      path: "./chapter05/chapter-5-building-a-service-catalog-for-kubernetes/optimization/vcluster"
+      helm:
+        releaseName: "vcluster-team-b"
+        valueFiles:
+          - "values.yaml"
+          - "$valuesRepo/chapter05/chapter-5-building-a-service-catalog-for-kubernetes/cluster/vcluster-team-b/optimization/vcluster/values.yaml"
+  project: default
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

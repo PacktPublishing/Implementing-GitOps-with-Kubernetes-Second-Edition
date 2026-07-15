@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: application-initializer-dev-team-a
+  namespace: argocd
+spec:
+  project: dev-team-a
+  source:
+    repoURL: https://dev.azure.com/ORGA-X/dev-team-a/_git/application
+    targetRevision: main
+    path: ./applicationset
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev-team-a
+  # Sync policy
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - Validate=false
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - FailOnSharedResource=true

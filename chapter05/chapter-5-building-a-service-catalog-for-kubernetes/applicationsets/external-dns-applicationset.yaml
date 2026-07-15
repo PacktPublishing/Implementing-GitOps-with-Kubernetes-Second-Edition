@@ -32,12 +32,15 @@ spec:
           ref: valuesRepo #use valuesRepo variable
         - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt #umbrella repo
           targetRevision: "{{values.branch}}" #point to the branch depending on the cluster branch pointer
+          path: "./chapter05/chapter-5-building-a-service-catalog-for-kubernetes/kustomize/dns/external-dns-secrets" #shared root-ca secret via kustomize
+        - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt #umbrella repo
+          targetRevision: "{{values.branch}}" #point to the branch depending on the cluster branch pointer
           path: "./chapter05/chapter-5-building-a-service-catalog-for-kubernetes/dns/external-dns" #path to the application in the umbrella repo
           helm:
             releaseName: "external-dns" # Release name override (defaults to application name)
             valueFiles:
               - "values.yaml" #use values.yaml from umbrella repo
-              - "$valuesRepo/chapter-5-building-a-service-catalog-for-kubernetes/cluster/{{name}}/dns/external-dns/values.yaml" #override umbrella values from custom values repo
+              - "$valuesRepo/chapter05/chapter-5-building-a-service-catalog-for-kubernetes/cluster/{{name}}/dns/external-dns/values.yaml" #override umbrella values from custom values repo
       destination:
         name: "{{name}}"
         namespace: "external-dns"

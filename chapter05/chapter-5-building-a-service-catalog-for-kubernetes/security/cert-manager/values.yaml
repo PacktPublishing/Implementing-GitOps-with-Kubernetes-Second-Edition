@@ -1,2 +1,12 @@
 cert-manager:
-  installCRDs: true
+  crds:
+    enabled: true # installCRDs is deprecated as of v1.20; use crds.enabled instead
+
+# Wrapper chart extras (templates/clusterissuer.yaml), sibling to the
+# cert-manager subchart values above, not nested under it.
+letsencrypt: false
+clusterIssuer:
+  name: letsencrypt
+  email: platform-team@example.com
+  server: https://acme-v02.api.letsencrypt.org/directory
+  ingressClassName: traefik

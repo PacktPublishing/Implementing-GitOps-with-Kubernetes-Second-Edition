@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dev-team-a
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project description
+  description: Enable Dev-Team-A Project to install new applications
+
+  # Scoped to the team's own repositories. A wildcard ("*") here would
+  # undermine the tenant boundary this project is supposed to enforce, since
+  # anyone with access to the project could then sync manifests from an
+  # arbitrary repository, including one they fully control.
+  sourceRepos:
+    - "https://dev.azure.com/ORGA-X/dev-team-a/_git/*"
+
+  destinations:
+    - namespace: "dev-team-a"
+      server: https://kubernetes.default.svc
+
+  # Restrict Namespace cluster-scoped resources from being created
+  clusterResourceBlacklist:
+    - group: ""
+      kind: "Namespace"
+
+  # Restrict namespaced-scoped resources from being created
+  namespaceResourceBlacklist:
+    - group: "argoproj.io"
+      kind: "AppProject"
+    - group: "argoproj.io"
+      kind: "Application"
+    - group: ""
+      kind: "ResourceQuota"
+    - group: "networking.k8s.io"
+      kind: "NetworkPolicy"
+
+  # "Apps in any namespace" self-service: lets dev-team-a commit Application
+  # manifests into its own namespace via plain GitOps, without a
+  # platform-team ticket or access to the argocd namespace. Every sync then
+  # runs under the dev-team-a-deployer service account instead of the
+  # controller's cluster-admin credentials, so even a maliciously crafted
+  # Application is bounded by ordinary Kubernetes RBAC. Requires a
+  # cluster-wide (not namespace-scoped) Argo CD installation and restricted
+  # SCM providers on the scmProvider/pullRequest generators.
+  sourceNamespaces:
+    - dev-team-a
+  destinationServiceAccounts:
+    - server: https://kubernetes.default.svc
+      namespace: dev-team-a
+      defaultServiceAccount: dev-team-a-deployer

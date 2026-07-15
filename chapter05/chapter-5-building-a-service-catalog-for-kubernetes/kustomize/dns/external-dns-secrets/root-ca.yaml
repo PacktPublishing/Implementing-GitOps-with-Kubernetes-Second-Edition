@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: root-ca
+  namespace: external-dns
+type: Opaque
+data:
+  ca.crt: "" # populated via kustomize secretGenerator/kubectl in a real environment
