@@ -6,7 +6,6 @@ Chart.lock
 .DS_Store
 .dockerignore
 docker-compose.yml
-Dockerfile
 
 # Kubernetes
 *.env
