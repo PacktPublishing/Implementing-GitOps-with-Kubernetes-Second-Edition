@@ -1,11 +1,12 @@
 ingress:
   host: "argocd.yourdomain.com"
   issuer: "letsencrypt"
-  className: "nginx"
+  className: "traefik"
+  routerTLS: "true" # TLS terminated at Traefik, not passthrough - see templates/ingress.yaml
 
 argo-cd:
   redis:
-    create: true
+    enabled: true # renamed from "create" in argo-helm v6+
 
   controller:
     replicas: 1
@@ -17,4 +18,4 @@ argo-cd:
     replicas: 2
 
   applicationSet:
-    replicaCount: 2
+    replicas: 2 # renamed from "replicaCount" in argo-helm v6+

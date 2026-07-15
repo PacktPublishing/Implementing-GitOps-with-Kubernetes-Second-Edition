@@ -1,0 +1,7 @@
+# Cluster-specific overrides layered on top of ./values.yaml via
+# helm.valueFiles in the ApplicationSet template.
+traefik:
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 300m

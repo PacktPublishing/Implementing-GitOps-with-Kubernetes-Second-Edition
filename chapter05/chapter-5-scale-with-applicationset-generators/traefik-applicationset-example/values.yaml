@@ -1,0 +1,16 @@
+# The umbrella chart and the traefik subchart share the same name.
+# Values meant for the umbrella itself go under global; anything meant
+# for the subchart must be nested under its name (traefik.*) to avoid
+# being silently ignored.
+global:
+  cluster:
+    name: in-cluster
+
+traefik:
+  resources:
+    requests:
+      memory: 250Mi
+      cpu: 250m
+    limits:
+      memory: 500Mi
+      cpu: 500m

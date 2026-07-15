@@ -1,17 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: application-initializer-devteam-a
+  name: application-initializer-dev-team-b
   namespace: argocd
 spec:
-  project: devteam-a
+  project: dev-team-b
   source:
-    repoURL: https://dev.azure.com/ORGA-X/devteam-a/_git/application
+    repoURL: https://dev.azure.com/ORGA-X/dev-team-b/_git/application
     targetRevision: main
     path: ./applicationset
   destination:
     server: https://kubernetes.default.svc
-    namespace: devteam-a
+    namespace: dev-team-b
   # Sync policy
   syncPolicy:
     automated:

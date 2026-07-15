@@ -1,0 +1,19 @@
+# The umbrella chart and the traefik subchart share the same name.
+# Values meant for the umbrella itself go under global; anything meant
+# for the subchart must be nested under its name (traefik.*), otherwise
+# it is silently ignored.
+traefik:
+  resources:
+    requests:
+      memory: 250Mi
+      cpu: 250m
+    limits:
+      memory: 500Mi
+      cpu: 500m
+  metrics:
+    prometheus:
+      serviceMonitor:
+        enabled: false
+  ingressClass:
+    enabled: true
+    isDefaultClass: true

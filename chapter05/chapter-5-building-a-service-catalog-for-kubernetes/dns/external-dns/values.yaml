@@ -1,5 +1,8 @@
 external-dns:
   txtOwnerId: "overlay_me"
 
+  # pspEnabled is gone: PodSecurityPolicy was removed from Kubernetes in
+  # v1.25, and the official kubernetes-sigs chart (unlike Bitnami's) never
+  # had this toggle in the first place.
   rbac:
-    pspEnabled: true
+    create: true

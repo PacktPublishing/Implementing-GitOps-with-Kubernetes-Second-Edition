@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: traefik
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            env: dev #cluster label
+        values:
+          branch: main #point to main branch
+    - clusters:
+        selector:
+          matchLabels:
+            env: prod #cluster label
+        values:
+          branch: main #point to main branch
+  template:
+    metadata:
+      name: "{{name}}-traefik" #name of cluster + name of application
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: ".;.."
+    spec:
+      project: default
+      destination:
+        name: "{{name}}"
+        namespace: traefik
+      sources:
+        - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt #umbrella chart repo
+          targetRevision: "{{values.branch}}" #point to the branch depending on the cluster branch pointer
+          ref: valuesRepo #use valuesRepo variable
+        - repoURL: git@github.com:PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.gitt
+          targetRevision: "{{values.branch}}"
+          path: "./chapter05/chapter-5-scale-with-applicationset-generators/traefik-applicationset-example" #path to the umbrella chart
+          helm:
+            ignoreMissingValueFiles: true
+            releaseName: traefik
+            valueFiles:
+              - values.yaml #umbrella chart defaults, global values vs traefik.* subchart overrides
+              - "$valuesRepo/chapter05/chapter-5-scale-with-applicationset-generators/traefik-applicationset-example/custom/traefik/values.yaml" #cluster-specific overrides
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
