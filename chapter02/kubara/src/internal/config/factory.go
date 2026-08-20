@@ -1,0 +1,144 @@
+package config
+
+import (
+	"fmt"
+
+	"github.com/kubara-io/kubara/internal/catalog"
+	"github.com/kubara-io/kubara/internal/envconfig"
+	"github.com/kubara-io/kubara/internal/service"
+)
+
+func NewClusterFromEnvWithCatalog(e *envconfig.EnvMap, catalogOptions catalog.LoadOptions) (Cluster, error) {
+	effectiveCatalogOptions := clusterCatalogLoadOptions(catalogOptions)
+
+	services, err := createServicesFromCatalogWithOptions(effectiveCatalogOptions, "")
+	if err != nil {
+		return Cluster{}, fmt.Errorf("create services from catalog: %w", err)
+	}
+
+	argoCD := ArgoCD{
+		SelfManaged: ArgoCDSelfManagedEnabled,
+		Repo: RepoProto{
+			HTTPS: &RepoType{
+				Configs: Repository{
+					URL:            e.ArgocdGitHttpsUrl,
+					TargetRevision: "main",
+				},
+				Components: Repository{
+					URL:            e.ArgocdGitHttpsUrl,
+					TargetRevision: "main",
+				},
+			},
+		},
+	}
+	if envconfig.IsConfiguredEnvValue(e.ArgocdHelmRepoUrl) {
+		helmRepoURL := envconfig.NormalizeHelmRepoURL(e.ArgocdHelmRepoUrl)
+		argoCD.HelmRepo = &HelmRepository{
+			URL: helmRepoURL,
+		}
+	}
+
+	return Cluster{
+		Name:             e.ProjectName,
+		Stage:            e.ProjectStage,
+		Type:             "<hub or spoke>",
+		DNSName:          "<subdomain.my-domain.com>",
+		SSOOrg:           "<my-org>",
+		SSOTeam:          "<my-team>",
+		IngressClassName: "traefik",
+		Terraform: &Terraform{
+			Provider:          TerraformProviderNone,
+			ProjectID:         "<project-id>",
+			KubernetesType:    "<edge, ske or cce>",
+			KubernetesVersion: "1.34",
+			DNS: DNS{
+				Name:  "<subdomain.my-domain.com>",
+				Email: "my-test@nowhere.com",
+			},
+		},
+		ArgoCD:   argoCD,
+		Catalogs: append([]string(nil), effectiveCatalogOptions.Catalogs...),
+		Services: services,
+	}, nil
+}
+
+func clusterCatalogLoadOptions(catalogOptions catalog.LoadOptions) catalog.LoadOptions {
+	effective := catalogOptions
+	if len(effective.Catalogs) == 0 {
+		effective.Catalogs = []string{catalog.DefaultGeneralCatalog}
+		return effective
+	}
+
+	effective.Catalogs = append([]string(nil), effective.Catalogs...)
+	return effective
+}
+
+func createServicesFromCatalogWithOptions(catalogOptions catalog.LoadOptions, clusterType string) (service.Services, error) {
+	cat, err := catalog.Load(catalogOptions)
+	if err != nil {
+		return nil, fmt.Errorf("load catalog: %w", err)
+	}
+	cat = cat.UserConfigurableServices()
+
+	services := make(service.Services, len(cat.Services))
+	for name, def := range cat.Services {
+		if clusterType != "" && len(def.Spec.ClusterTypes) > 0 {
+			include := false
+			for _, allowed := range def.Spec.ClusterTypes {
+				if allowed == clusterType {
+					include = true
+					break
+				}
+			}
+			if !include {
+				continue
+			}
+		}
+
+		cfg, err := applySchemaDefaults(def.Spec.ConfigSchema, map[string]any{})
+		if err != nil {
+			return nil, fmt.Errorf("apply defaults for service %q: %w", name, err)
+		}
+
+		services[name] = service.Service{
+			Status: def.Spec.Status,
+			Config: cfg,
+		}
+	}
+
+	return services, nil
+}
+
+func CreateSpokeScaffolding(name string, catalogOptions catalog.LoadOptions) Cluster {
+	effectiveCatalogOptions := clusterCatalogLoadOptions(catalogOptions)
+
+	return Cluster{
+		Name:    name,
+		Stage:   "<stage>",
+		Type:    "spoke",
+		DNSName: "<dns-name>",
+		SSOOrg:  "<my-org>",
+		SSOTeam: "<my-team>",
+		Terraform: &Terraform{
+			Provider:          "<provider>",
+			ProjectID:         "<project-id>",
+			KubernetesType:    "<edge or ske>",
+			KubernetesVersion: "<version>",
+			DNS: DNS{
+				Name:  "<dns-name>",
+				Email: "<dns-mail>",
+			},
+		},
+		ArgoCD: ArgoCD{
+			SelfManaged: ArgoCDSelfManagedEnabled,
+			Repo: RepoProto{
+				HTTPS: &RepoType{
+					Configs:    Repository{URL: "https://git.example.com/platform/repo.git", TargetRevision: "main"},
+					Components: Repository{URL: "https://git.example.com/platform/repo.git", TargetRevision: "main"},
+				},
+			},
+		},
+		Catalogs: append([]string(nil), effectiveCatalogOptions.Catalogs...),
+		Services: nil,
+	}
+}

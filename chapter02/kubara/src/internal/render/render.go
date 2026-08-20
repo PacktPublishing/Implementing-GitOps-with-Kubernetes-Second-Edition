@@ -1,0 +1,391 @@
+package render
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
+	"strings"
+	"text/template"
+
+	"github.com/kubara-io/kubara/internal/catalog"
+
+	"github.com/Masterminds/sprig/v3"
+	"go.yaml.in/yaml/v3"
+)
+
+type TemplateType int
+
+const (
+	Terraform TemplateType = iota
+	Helm
+	All
+)
+
+const (
+	DefaultPlatformComponentsPath string = "platform-components"
+	DefaultPlatformConfigsPath    string = "platform-configs"
+)
+
+var templateName = map[TemplateType]string{
+	Terraform: "terraform",
+	Helm:      "helm",
+	All:       "all",
+}
+
+func TemplateFiles(options TemplateOptions) ([]TemplateResult, error) {
+	fileList, err := getTemplateFiles(options)
+	if err != nil {
+		return nil, fmt.Errorf("get template files for provider %q: %w", options.Provider, err)
+	}
+
+	selected, err := selectTemplateFilesForProvider(fileList, options.Provider, options.CatalogOptions.Overwrite)
+	if err != nil {
+		return nil, fmt.Errorf("select templates for provider %q: %w", options.Provider, err)
+	}
+
+	selected = filterTemplateFiles(selected, options.PathPredicate)
+
+	return templateResultsFromFiles(selected, options.Data)
+}
+
+func filterTemplateFiles(files []templateFile, predicate TemplatePathPredicate) []templateFile {
+	if predicate == nil {
+		return files
+	}
+
+	filtered := make([]templateFile, 0, len(files))
+	for _, file := range files {
+		if predicate(StripProviderPath(file.sourcePath)) {
+			filtered = append(filtered, file)
+		}
+	}
+
+	return filtered
+}
+
+func validateTemplateType(tplType TemplateType) error {
+	if _, ok := templateName[tplType]; !ok {
+		return fmt.Errorf("invalid template type %d", tplType)
+	}
+	return nil
+}
+
+func templateFuncMap() template.FuncMap {
+	funcs := sprig.FuncMap()
+	funcs["toYaml"] = func(v any) (string, error) {
+		out, err := yaml.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("marshal value to YAML: %w", err)
+		}
+		return strings.TrimSuffix(string(out), "\n"), nil
+	}
+	return funcs
+}
+
+// TemplateResult represents the result of templating a single file
+type TemplateResult struct {
+	Path    string // Original relative path
+	Content string // Templated content
+	Error   error  // Any error that occurred during templating
+}
+
+type TemplatePathPredicate func(path string) bool
+
+type TemplateOptions struct {
+	Type           TemplateType
+	Provider       string
+	CatalogOptions catalog.LoadOptions
+	Data           any
+	PathPredicate  TemplatePathPredicate
+}
+
+type templateSource struct {
+	name     string
+	fsys     fs.FS
+	baseRoot string
+	order    int
+}
+
+type templateFile struct {
+	sourcePath  string
+	readPath    string
+	fsys        fs.FS
+	sourceName  string
+	sourceOrder int
+}
+
+func (tt TemplateType) String() string {
+	return templateName[tt]
+}
+
+func loadTemplateSources(options TemplateOptions) ([]templateSource, error) {
+	catalogSources, err := catalog.ResolveSources(options.CatalogOptions)
+	if err != nil {
+		return nil, err
+	}
+	sources := make([]templateSource, 0, len(catalogSources))
+
+	for _, cat := range catalogSources {
+		source, err := catalog.ResolveSource(cat)
+		if err != nil {
+			return nil, fmt.Errorf("resolve catalog source: %w", err)
+		}
+		sources = append(sources, templateSource{
+			name:     cat,
+			fsys:     os.DirFS(source.RootPath),
+			baseRoot: ".",
+			order:    len(sources),
+		})
+	}
+
+	return sources, nil
+}
+
+func joinTemplateRoot(baseRoot string, elems ...string) string {
+	if baseRoot == "." || baseRoot == "" {
+		if len(elems) == 0 {
+			return "."
+		}
+		return path.Join(elems...)
+	}
+
+	parts := append([]string{baseRoot}, elems...)
+	return path.Join(parts...)
+}
+
+func templateRootsForType(baseRoot string, templateType TemplateType) []string {
+	switch templateType {
+	case All:
+		return []string{
+			joinTemplateRoot(baseRoot, DefaultPlatformConfigsPath),
+			joinTemplateRoot(baseRoot, DefaultPlatformComponentsPath),
+		}
+	default:
+		return []string{
+			joinTemplateRoot(baseRoot, DefaultPlatformConfigsPath, templateType.String()),
+			joinTemplateRoot(baseRoot, DefaultPlatformComponentsPath, templateType.String()),
+		}
+	}
+}
+
+func makeTemplateFileWalkDirFunc(source templateSource, out *[]templateFile) fs.WalkDirFunc {
+	return func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(source.baseRoot, path)
+		if err != nil {
+			return err
+		}
+
+		normalized := filepath.ToSlash(rel)
+		if strings.HasPrefix(normalized, "services") {
+			return nil
+		}
+
+		*out = append(*out, templateFile{
+			sourcePath:  normalized,
+			readPath:    filepath.ToSlash(path),
+			fsys:        source.fsys,
+			sourceName:  source.name,
+			sourceOrder: source.order,
+		})
+		return nil
+	}
+}
+
+func getTemplateFiles(options TemplateOptions) ([]templateFile, error) {
+	if err := validateTemplateType(options.Type); err != nil {
+		return nil, err
+	}
+
+	sources, err := loadTemplateSources(options)
+	if err != nil {
+		return nil, fmt.Errorf("load template sources: %w", err)
+	}
+
+	out := make([]templateFile, 0)
+	for _, source := range sources {
+		walkDirFunc := makeTemplateFileWalkDirFunc(source, &out)
+		var walkErr error
+
+		for _, root := range templateRootsForType(source.baseRoot, options.Type) {
+			if err := fs.WalkDir(source.fsys, root, walkDirFunc); err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
+					continue
+				}
+				walkErr = errors.Join(walkErr, err)
+			}
+		}
+
+		if walkErr != nil {
+			return nil, fmt.Errorf("walk %s templates for type %q: %w", source.name, options.Type.String(), walkErr)
+		}
+	}
+
+	return out, nil
+}
+
+func normalizeProviderName(provider string) string {
+	return strings.ToLower(strings.TrimSpace(provider))
+}
+
+func splitProviderPath(relPath string) (string, string, bool) {
+	normalized := filepath.ToSlash(relPath)
+	parts := strings.Split(normalized, "/")
+	for idx := 0; idx+1 < len(parts); idx++ {
+		// Only treat this segment as a provider selector when it appears
+		// directly inside the Terraform template directory.
+		if idx == 0 || parts[idx-1] != Terraform.String() {
+			continue
+		}
+
+		provider := strings.ToLower(parts[idx])
+		if provider == "" {
+			continue
+		}
+
+		// Robustly check that we are strictly within the platform-configs root directory
+		// before stripping the provider segment.
+		if parts[0] == DefaultPlatformConfigsPath {
+			stripped := append([]string{}, parts[:idx]...)
+			stripped = append(stripped, parts[idx+1:]...)
+			return strings.Join(stripped, "/"), provider, true
+		}
+
+		// Under platform-components, we do NOT strip the provider segment from the path,
+		// but we still want to detect the provider name to filter out other providers' assets!
+		if parts[0] == DefaultPlatformComponentsPath {
+			return normalized, provider, true
+		}
+	}
+
+	return normalized, "", false
+}
+
+// StripProviderPath removes a Terraform provider selector segment from a
+// relative template path (e.g. ".../terraform/stackit/...") if present.
+func StripProviderPath(relPath string) string {
+	stripped, _, _ := splitProviderPath(relPath)
+	return stripped
+}
+
+func shouldPreferTemplateFile(current templateFile, next templateFile, currentProviderSpecific bool, nextProviderSpecific bool, overwrite bool, strippedPath string) (bool, error) {
+	if current.sourceOrder != next.sourceOrder {
+		if !overwrite {
+			return false, fmt.Errorf("template %q already exists in both %q and %q", strippedPath, current.sourceName, next.sourceName)
+		}
+		return next.sourceOrder > current.sourceOrder, nil
+	}
+
+	if currentProviderSpecific != nextProviderSpecific {
+		return nextProviderSpecific, nil
+	}
+
+	return false, nil
+}
+
+func selectTemplateFilesForProvider(files []templateFile, provider string, overwrite bool) ([]templateFile, error) {
+	selectedProvider := normalizeProviderName(provider)
+	sortedFiles := append([]templateFile(nil), files...)
+	sort.Slice(sortedFiles, func(i, j int) bool {
+		if sortedFiles[i].sourcePath == sortedFiles[j].sourcePath {
+			if sortedFiles[i].sourceOrder == sortedFiles[j].sourceOrder {
+				return sortedFiles[i].readPath < sortedFiles[j].readPath
+			}
+			return sortedFiles[i].sourceOrder < sortedFiles[j].sourceOrder
+		}
+		return sortedFiles[i].sourcePath < sortedFiles[j].sourcePath
+	})
+
+	selected := make(map[string]templateFile, len(sortedFiles))
+	keys := make([]string, 0, len(sortedFiles))
+
+	for _, file := range sortedFiles {
+		strippedPath, sourceProvider, isProviderSpecific := splitProviderPath(file.sourcePath)
+		if isProviderSpecific && sourceProvider != selectedProvider {
+			continue
+		}
+
+		current, exists := selected[strippedPath]
+		if !exists {
+			selected[strippedPath] = file
+			keys = append(keys, strippedPath)
+			continue
+		}
+
+		_, _, currentProviderSpecific := splitProviderPath(current.sourcePath)
+		replaceCurrent, err := shouldPreferTemplateFile(current, file, currentProviderSpecific, isProviderSpecific, overwrite, strippedPath)
+		if err != nil {
+			return nil, err
+		}
+		if replaceCurrent {
+			selected[strippedPath] = file
+		}
+	}
+
+	sort.Strings(keys)
+	out := make([]templateFile, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, selected[key])
+	}
+
+	return out, nil
+}
+
+func templateResultsFromFiles(fileList []templateFile, data any) ([]TemplateResult, error) {
+	results := make([]TemplateResult, 0, len(fileList))
+	var allErrors []error
+
+	for _, file := range fileList {
+		result := TemplateResult{Path: file.sourcePath}
+
+		content, err := fs.ReadFile(file.fsys, file.readPath)
+		if err != nil {
+			result.Error = err
+			results = append(results, result)
+			allErrors = append(allErrors, err)
+			continue
+		}
+
+		if strings.HasSuffix(file.readPath, ".tplt") {
+			tmpl, err := template.New(file.sourcePath).Funcs(templateFuncMap()).Parse(string(content))
+			if err != nil {
+				result.Error = err
+				results = append(results, result)
+				allErrors = append(allErrors, err)
+				continue
+			}
+
+			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, data); err != nil {
+				result.Error = err
+				results = append(results, result)
+				allErrors = append(allErrors, err)
+				continue
+			}
+
+			result.Content = buf.String()
+			results = append(results, result)
+		} else {
+			result.Content = string(content)
+			results = append(results, result)
+		}
+	}
+
+	var combinedError error
+	if len(allErrors) > 0 {
+		combinedError = errors.Join(allErrors...)
+	}
+
+	return results, combinedError
+}

@@ -1,0 +1,132 @@
+package helm
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+// RepoOptions for helm repository operations
+type RepoOptions struct {
+	Name     string
+	URL      string
+	Username string
+	Password string
+	CertFile string
+	KeyFile  string
+	CAFile   string
+	Timeout  time.Duration
+}
+
+// AddRepository adds a helm repository
+func AddRepository(ctx context.Context, opts RepoOptions) error {
+	if !strings.HasPrefix(opts.URL, "http") && !strings.HasPrefix(opts.URL, "oci") {
+		return nil
+	}
+
+	args := []string{"repo", "add", opts.Name, opts.URL}
+
+	if opts.Username != "" && opts.Password != "" {
+		args = append(args, "--username", opts.Username, "--password", opts.Password)
+	}
+
+	if opts.CertFile != "" && opts.KeyFile != "" {
+		args = append(args, "--cert-file", opts.CertFile, "--key-file", opts.KeyFile)
+	}
+
+	if opts.CAFile != "" {
+		args = append(args, "--ca-file", opts.CAFile)
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "helm", args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return &HelmRepoError{
+			Operation: "add",
+			RepoName:  opts.Name,
+			Err:       err,
+			Stderr:    stderr.String(),
+		}
+	}
+
+	return nil
+}
+
+// UpdateRepository fetches updates for a helm repository
+func UpdateRepository(ctx context.Context, opts RepoOptions) error {
+	args := []string{"repo", "update", opts.Name}
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "helm", args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return &HelmRepoError{
+			Operation: "update",
+			RepoName:  opts.Name,
+			Err:       err,
+			Stderr:    stderr.String(),
+		}
+	}
+
+	return nil
+}
+
+// UpdateAllRepositories refreshes the index for every configured helm repository.
+// This is necessary in addition to per-alias UpdateRepository calls because helm
+// dependency resolution can hit the global repository cache when a subchart in
+// Chart.yaml references a repository by URL rather than by alias. A stale entry
+// from a previous run is otherwise not invalidated, which leads to
+// "can't get a valid version for subchart" errors during dependency update.
+func UpdateAllRepositories(ctx context.Context) error {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "helm", "repo", "update")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return &HelmRepoError{
+			Operation: "update",
+			Err:       err,
+			Stderr:    stderr.String(),
+		}
+	}
+
+	return nil
+}
+
+// Repository represents a helm repository
+type Repository struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+// HelmRepoError provides detailed error information for helm repo operations
+type HelmRepoError struct {
+	Operation string
+	RepoName  string
+	Err       error
+	Stderr    string
+}
+
+func (e *HelmRepoError) Error() string {
+	if e.RepoName != "" {
+		return fmt.Sprintf("helm repo %s failed for %s: %v\nStderr: %s",
+			e.Operation, e.RepoName, e.Err, e.Stderr)
+	}
+	return fmt.Sprintf("helm repo %s failed: %v\nStderr: %s",
+		e.Operation, e.Err, e.Stderr)
+}
+
+func (e *HelmRepoError) Unwrap() error {
+	return e.Err
+}
