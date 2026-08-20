@@ -1,20 +1,29 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+# Uses the slim, officially maintained Python 3.14 base image.
+FROM python:3.14-slim
 
-# Set the working directory in the container
+# Sets the working directory for all subsequent commands and the application startup.
 WORKDIR /usr/src/app
 
-# Copy the current directory contents into the container at /usr/src/app
+# Copies only the dependency list first so Docker can cache this build step.
+COPY requirements.txt .
+
+# Installs the Python dependencies without retaining pip's unnecessary download cache.
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
+# Copies the application code into the image's working directory.
 COPY . .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Creates an unprivileged user with a dedicated home directory for the application.
+RUN useradd --create-home appuser
 
-# Make port 80 available to the world outside this container
+# Runs all subsequent instructions and the container process without root privileges.
+USER appuser
+
+# Documents that the application listens on TCP port 80 without publishing the port itself.
 EXPOSE 80
 
-# Define environment variable
-ENV NAME World
+# Sets the NAME environment variable to World; the current app.py does not use it yet.
+ENV NAME=World
 
-# Run app.py when the container launches
+# Starts the Flask application with Python when the container launches.
 CMD ["python", "app.py"]
