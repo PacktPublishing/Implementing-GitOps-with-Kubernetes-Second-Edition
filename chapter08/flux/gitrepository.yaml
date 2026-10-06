@@ -1,0 +1,14 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: gitops-ch08
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+  ref:
+    branch: main
+  # Restrict what is fetched, which keeps large repositories cheap to reconcile.
+  ignore: |
+    /*
+    !/chapter08/gitops

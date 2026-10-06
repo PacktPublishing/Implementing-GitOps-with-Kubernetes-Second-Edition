@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: gitops-ch08
+  namespace: argocd
+spec:
+  description: Chapter 8 multi-cloud sample
+  sourceRepos:
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+  destinations:
+    - namespace: weather-app
+      name: "*"
+  # Refuse cluster-scoped resources other than the namespace this project owns.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: "*"
+    - group: apps
+      kind: "*"

@@ -1,0 +1,41 @@
+groups:
+  - name: flux-reconciliation
+    interval: 1m
+    rules:
+      # NOTE: `cloud` is an external label added by the scraping agent, not by
+      # Kustomize. See README.md. Drop it if you have not configured one.
+      # A Kustomization that has not been ready for 15 minutes means the cluster
+      # is no longer converging on Git. This is the signal that matters most.
+      - alert: FluxReconciliationFailing
+        expr: |
+          max by (namespace, name, kind, cloud) (
+            gotk_reconcile_condition{type="Ready", status="False"}
+          ) == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flux {{ $labels.kind }} {{ $labels.namespace }}/{{ $labels.name }} has not reconciled"
+          description: "Desired state in Git is not being applied on {{ $labels.cloud }}."
+
+      # Suspended is a legitimate operational action, but a resource left
+      # suspended is silent drift waiting to happen.
+      - alert: FluxResourceSuspended
+        expr: |
+          max by (namespace, name, kind, cloud) (gotk_suspend_status) == 1
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Flux {{ $labels.kind }} {{ $labels.namespace }}/{{ $labels.name }} suspended for over two hours"
+
+      - alert: FluxSourceUnavailable
+        expr: |
+          max by (namespace, name, cloud) (
+            gotk_reconcile_condition{kind=~"GitRepository|OCIRepository", type="Ready", status="False"}
+          ) == 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flux cannot read its source {{ $labels.namespace }}/{{ $labels.name }}"

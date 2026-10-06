@@ -1,0 +1,17 @@
+{
+  "name": "weather-app",
+  "version": "2.0.0",
+  "description": "Sample multi-cloud GitOps application: renders a temperature chart from CSV data",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "license": "MIT"
+}

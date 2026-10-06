@@ -1,0 +1,52 @@
+# Flux installed declaratively by the Flux Operator, as introduced in Chapter 4.
+# `flux bootstrap` still works and the first edition used it; the operator is
+# preferred here because the installed version, the component set and the sync
+# configuration all become one reconciled object rather than a commit made by
+# a CLI on someone's laptop.
+#
+# Version note. Tofu Controller's support matrix names Flux v2.6.x for the
+# v0.16 line, but that row does not describe a combination that ever shipped:
+# Flux 2.6 carries source-controller v1.6.0, while v1.7.0 is what ships with
+# Flux 2.7. Flux 2.6 also reached end of life when 2.9 shipped in June 2026, so
+# following the matrix literally would pin this cluster to an unsupported
+# release. We pin 2.7.x, the earliest supported release that actually carries
+# the source-controller version the matrix names.
+#
+# Applied once from a terminal:
+#   flux plugin install operator          # requires Flux CLI 2.9 or later
+#   flux operator install -f chapter09/flux/flux-instance.yaml
+#
+# Note that this file is deliberately NOT reconciled by Flux: the instance that
+# installs Flux cannot be managed by the Flux it installs. kustomization.yaml in
+# this directory lists only tofu-controller.yaml for that reason.
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
+metadata:
+  name: flux
+  namespace: flux-system
+  annotations:
+    fluxcd.controlplane.io/reconcileEvery: "1h"
+spec:
+  distribution:
+    version: "2.7.x"
+    registry: "ghcr.io/fluxcd"
+    artifact: "oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests"
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  cluster:
+    type: kubernetes
+    multitenant: false
+    networkPolicy: true
+    domain: "cluster.local"
+  sync:
+    kind: GitRepository
+    url: "https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git"
+    ref: "refs/heads/main"
+    path: "chapter09/clusters/mgmt"
+    # Only needed if you point `url` at a private fork: the operator does not
+    # create credentials the way `flux bootstrap` used to. Create a Secret
+    # holding a PAT scoped to that repository and reference it here, e.g.
+    # pullSecret: gitops-ch08-auth

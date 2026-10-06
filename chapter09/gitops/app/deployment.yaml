@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-app
+  namespace: weather
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: weather-app
+  template:
+    metadata:
+      labels:
+        app: weather-app
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: ghcr.io/packtpublishing/weather-app:2.0.0
+          env:
+            # These two values are not written by a human and are not in Git.
+            # kustomize-controller substitutes them at build time from the
+            # Secret that tofu-controller wrote after applying dev-data.
+            - name: BLOB_ENDPOINT
+              value: ${blob_endpoint}
+            - name: STORAGE_ACCOUNT
+              value: ${storage_account_name}
+          ports:
+            - containerPort: 3000
+          # The readiness probe is the only thing in the cluster that can tell
+          # you the storage account is unreachable. A pod that starts, serves
+          # traffic and cannot resolve its blob endpoint looks healthy by every
+          # other measure -- which is exactly the failure the private DNS zone
+          # in modules/data exists to prevent.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

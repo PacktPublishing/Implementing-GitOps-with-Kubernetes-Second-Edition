@@ -1,0 +1,87 @@
+name: ch08-build-azure
+
+# Continuous integration only. This workflow builds and publishes an image and
+# then stops. It holds no cluster credentials and never runs kubectl: the Flux
+# extension in the cluster pulls the change. That boundary is the whole point.
+#
+# Note on permissions: the federated identity holds AcrPush only. That is
+# sufficient to log in and push, but NOT to run `az acr build`, which is an ACR
+# Tasks quick build and additionally requires
+# Microsoft.ContainerRegistry/registries/scheduleRun/action (the "Container
+# Registry Tasks Contributor" role). Building on the runner keeps the grant
+# minimal.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'chapter08/src/**'
+      - '.github/workflows/ch08-build-azure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for OIDC. There is no client secret anywhere in this workflow.
+  id-token: write
+
+env:
+  IMAGE_NAME: weather-app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive image tag
+        id: meta
+        run: echo "tag=2.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      # Federated login: GitHub mints a short-lived OIDC token, Entra exchanges it
+      # for an access token for an identity that holds AcrPush.
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: chapter08/src
+          file: chapter08/src/Dockerfile
+          push: true
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Publish the desired state as an OCI artifact and sign it, so the
+      # OCIRepository in flux/ can verify it. Without this signing step the
+      # cosign verification in that manifest fails closed.
+      - name: Install Flux and Cosign
+        uses: sigstore/cosign-installer@v3
+      - run: curl -sL https://fluxcd.io/install.sh | sudo bash
+
+      - name: Push manifests as an OCI artifact
+        id: artifact
+        run: |
+          REPO="${{ vars.ACR_NAME }}.azurecr.io/manifests/${IMAGE_NAME}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          flux push artifact "oci://${REPO}:${TAG}" \
+            --path chapter08/gitops \
+            --source "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --revision "${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
+          echo "ref=${REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign the artifact (keyless)
+        run: cosign sign --yes "${{ steps.artifact.outputs.ref }}"

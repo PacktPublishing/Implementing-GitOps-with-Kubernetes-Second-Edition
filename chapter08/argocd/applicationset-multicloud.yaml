@@ -1,0 +1,44 @@
+# One definition, every registered cluster. The generator reads the `cloud` label
+# that was set when each cluster was registered, and the template picks the
+# matching overlay path. Adding a third cloud means registering a cluster and
+# adding an overlay directory; the ApplicationSet does not change.
+#
+# Chapter 5 covers ApplicationSet generators in depth; the point here is that the
+# same mechanism spans providers.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: weather-app-multicloud
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: cloud
+              operator: In
+              values: [azure, aws]
+
+  template:
+    metadata:
+      name: 'weather-app-{{.name}}'
+    spec:
+      project: gitops-ch08
+      source:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+        targetRevision: main
+        # The label value selects the overlay, so provider differences stay in
+        # the repository layout instead of leaking into the control plane.
+        path: 'chapter08/gitops/overlays/{{index .metadata.labels "cloud"}}'
+      destination:
+        name: '{{.name}}'
+        namespace: weather-app
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
