@@ -1,0 +1,27 @@
+# The same Terraform kind, on EKS. Compare with dev-network.yaml: the spec is
+# identical apart from the identity block. Azure federates a projected token
+# into the azurerm provider; AWS annotates the tf-runner service account with
+# an IAM role and the SDK does the rest.
+#
+#   eksctl utils associate-iam-oidc-provider --cluster <name> --approve
+#   kubectl annotate -n flux-system serviceaccount tf-runner \
+#     eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/tf-runner
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: aws-dev
+  namespace: flux-system
+spec:
+  interval: 5m
+  approvePlan: auto
+  path: ./chapter09/iac/aws/dev
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  writeOutputsToSecret:
+    name: aws-dev-outputs
+    outputs:
+      - bucket_name
+      - bucket_arn
+  destroyResourcesOnDeletion: true

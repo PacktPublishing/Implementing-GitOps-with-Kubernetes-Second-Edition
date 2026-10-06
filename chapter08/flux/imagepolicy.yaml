@@ -1,0 +1,56 @@
+# Image automation closes the loop without granting CI access to the cluster:
+# CI publishes an image, the reflector notices it, and the automation controller
+# writes the new reference back to Git as a commit.
+#
+# API note: ImageRepository, ImagePolicy and ImageUpdateAutomation were promoted
+# to stable v1 in Flux 2.7, which is what microsoft.flux 1.24.0 ships.
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: weather-app
+  namespace: flux-system
+spec:
+  interval: 5m
+  image: gitopsch08XXXXXX.azurecr.io/weather-app
+  provider: azure
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: weather-app
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: weather-app
+  policy:
+    semver:
+      range: ">=2.0.0"
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: weather-app
+  namespace: flux-system
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: gitops-ch08
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: "chore(ch08): update weather-app image to {{range .Updated.Images}}{{println .}}{{end}}"
+    push:
+      branch: main
+  update:
+    # The Setters strategy only rewrites lines carrying an $imagepolicy marker.
+    # See the marker comment in gitops/overlays/azure/kustomization.yaml. Without
+    # it, this automation runs successfully and changes nothing.
+    path: ./chapter08/gitops/overlays/azure
+    strategy: Setters

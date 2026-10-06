@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Replace ACCOUNT_ID with the account_id output from iac/aws. The first edition
+# hardcoded a real account number directly in the Deployment; parameterising it
+# here is both a portability and a disclosure fix.
+images:
+  - name: weather-app
+    newName: ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/weather-app
+    newTag: "2.0.0"
+
+patches:
+  - path: deployment-patch.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      cloud: aws

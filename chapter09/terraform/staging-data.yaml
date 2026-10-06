@@ -1,0 +1,72 @@
+# Environment: staging. Mode: GitOps Automation, with remote state.
+# The data plane for staging; same wiring as dev-data, different backend.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: staging-data
+  namespace: flux-system
+spec:
+  interval: 10m
+  approvePlan: auto
+  path: ./chapter09/iac/azure/staging/data
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+
+  dependsOn:
+    - name: staging-network
+  retryInterval: 30s
+
+  varsFrom:
+    - kind: Secret
+      name: staging-network-outputs
+
+  backendConfig:
+    customConfiguration: |
+      backend "azurerm" {
+        resource_group_name  = "gitops-tfstate-rg"
+        storage_account_name = "<tfstate-storage-account>"
+        container_name       = "tfstate"
+        key                  = "staging/data.tfstate"
+        use_oidc             = true
+        use_azuread_auth     = true
+      }
+
+  tfstate:
+    forceUnlock: "no"
+
+  writeOutputsToSecret:
+    name: staging-data-outputs
+    outputs:
+      - storage_account_name
+      - blob_endpoint
+
+  destroyResourcesOnDeletion: true
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

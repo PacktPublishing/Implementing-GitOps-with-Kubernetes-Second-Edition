@@ -1,0 +1,103 @@
+# Tofu Controller installed as a HelmRelease, so that the controller that
+# reconciles infrastructure is itself reconciled from Git.
+#
+# Version note: at the time of writing the latest release is v0.16.5 (August
+# 2026). The project is still on a 0.x line and the Terraform kind is served
+# at infra.contrib.fluxcd.io/v1alpha2. Pin the version and read the changelog
+# before upgrading.
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: tofu-controller
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://flux-iac.github.io/tofu-controller
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tofu-controller
+  namespace: flux-system
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: tofu-controller
+      version: "0.16.5"
+      sourceRef:
+        kind: HelmRepository
+        name: tofu-controller
+        namespace: flux-system
+  install:
+    crds: Create
+  upgrade:
+    crds: CreateReplace
+  values:
+    replicaCount: 1
+
+    runner:
+      # The published tf-runner image already contains OpenTofu: the project's
+      # runner.Dockerfile copies the tofu binary out of
+      # ghcr.io/opentofu/opentofu:<version>-minimal. For the walkthrough you do
+      # not need to build anything, so this block stays commented out.
+      #
+      # Uncomment and point at your own image when you need a different
+      # OpenTofu version, Terraform instead of OpenTofu, or extra tooling in
+      # the runner. Build it from runner/Dockerfile against the -base tag.
+      #
+      # image:
+      #   repository: ghcr.io/<your-org>/tofu-runner
+      #   tag: v0.16.5
+
+      serviceAccount:
+        # An allowlist by construction, not by enforcement. The chart renders
+        # the tf-runner ServiceAccount (and its token Secret) only into these
+        # namespaces; the controller itself checks nothing. A Terraform object
+        # anywhere else fails because its runner has no service account to use.
+        # That bound holds only while tenants cannot create a ServiceAccount
+        # called tf-runner themselves, so pair it with RBAC.
+        #
+        # It matters because watchAllNamespaces defaults to true: the controller
+        # notices a Terraform object in any namespace.
+        #
+        # Every namespace listed here must exist before the chart is installed,
+        # which is what flux/namespaces.yaml is for.
+        #
+        # Mind the nesting. The key belongs under serviceAccount, not directly
+        # under runner. Helm ignores an unknown value without complaining, so a
+        # misplaced runner.allowedNamespaces leaves the control looking
+        # configured and doing nothing at all.
+        allowedNamespaces:
+          - flux-system
+          - infra-dev
+          - infra-staging
+          - infra-prod
+
+        annotations:
+          # Entra Workload ID: binds the tf-runner service account to a
+          # user-assigned managed identity. On EKS the equivalent annotation is
+          # eks.amazonaws.com/role-arn.
+          azure.workload.identity/client-id: "<managed-identity-client-id>"
+
+    # Prometheus metrics. The chart default is false, so there is nothing to
+    # scrape, and nothing to alert on, until you turn it on. Enable the
+    # ServiceMonitor as well if you run the Prometheus Operator.
+    # metrics:
+    #   enabled: true
+    #   serviceMonitor:
+    #     enabled: true
+
+    # Plan output on pull requests. Still labelled a Technology Preview by the
+    # project. Disabled here because it needs a forge API token; see the Branch
+    # Planner section of the chapter and
+    # https://flux-iac.github.io/tofu-controller/branch-planner/ for the
+    # ConfigMap and Secret it expects.
+    #
+    # Be aware of what it does: for every pull request it creates a plan-only
+    # Terraform object, so code from an unmerged branch runs `tofu plan` with
+    # the runner's cloud identity. A plan can execute provider and data source
+    # code. Restrict who may open pull requests against watched repositories.
+    branchPlanner:
+      enabled: false

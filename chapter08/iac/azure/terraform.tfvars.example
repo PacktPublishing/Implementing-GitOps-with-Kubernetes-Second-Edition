@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and adjust. Never commit real values.
+subscription_id       = "00000000-0000-0000-0000-000000000000"
+location              = "switzerlandnorth"
+github_repository     = "your-org/your-gitops-repo"
+gitops_repository_url = "https://github.com/your-org/your-gitops-repo.git"
+
+# Only needed if your repository (or your enterprise/org) has "Use immutable
+# subject claims" enabled under Settings > Actions > General. Check with:
+#   gh api /repos/your-org/your-gitops-repo/actions/oidc/customization/sub --jq .sub_claim_prefix
+# If that prints "use_default":true with no sub_claim_prefix, leave this unset.
+# github_oidc_subject_prefix = "repo:your-org@12345/your-gitops-repo@67890"
+
+# Only needed if gitops_repository_url points at a PRIVATE repository. Create
+# the referenced secret with kubectl before applying (see variables.tf).
+# gitops_auth_secret_name = "gitops-ch08-auth"

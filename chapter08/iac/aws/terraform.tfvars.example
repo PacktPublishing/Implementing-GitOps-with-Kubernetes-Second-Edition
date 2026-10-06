@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and adjust. Never commit real values.
+# The region must match where AWS IAM Identity Center is configured.
+region                       = "eu-central-1"
+idc_admin_group_display_name = "PlatformAdmins"
+github_repository            = "your-org/your-gitops-repo"
+gitops_repository_url        = "https://github.com/your-org/your-gitops-repo.git"
+enable_ack_capability        = false

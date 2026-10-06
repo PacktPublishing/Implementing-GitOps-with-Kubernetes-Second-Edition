@@ -1,0 +1,42 @@
+# Checkov configuration for the chapter's OpenTofu code.
+#
+# Run against the source, not the plan, so that a contributor sees the finding
+# in the editor and not only in CI:
+#   checkov --config-file policy/.checkov.yaml
+
+directory:
+  - iac
+framework:
+  - terraform
+quiet: true
+compact: true
+
+# Fail the build on anything that would widen the network or identity surface.
+check:
+  - CKV_AZURE_44   # storage minimum TLS version
+  - CKV_AZURE_59   # storage account public access
+  - CKV_AZURE_190  # storage blob public access disabled
+
+skip-check:
+  # Customer-managed keys are out of scope for the chapter walkthrough; the
+  # platform-managed key is still encryption at rest.
+  - CKV2_AZURE_1
+
+  # Replication. This one contradicts a decision the chapter defends: the data
+  # module chooses ZRS in production and LRS everywhere else, because paying
+  # for zone redundancy in a development environment is waste. A policy that
+  # demands GRS/ZRS unconditionally would fail the repository's own code, so it
+  # is skipped rather than quietly ignored. Enable it and drop the conditional
+  # in modules/data if your estate needs it everywhere.
+  - CKV_AZURE_206
+
+  # Queue service logging. The walkthrough uses blob storage only and never
+  # enables the queue service, so there is nothing to log. Revisit if you add
+  # queues.
+  - CKV_AZURE_33
+
+  # Subnets without an NSG. Deliberate for a walkthrough that would otherwise
+  # spend a page on rules; the storage account is reachable only through a
+  # private endpoint and public network access is disabled. Add NSGs before
+  # this pattern carries anything real.
+  - CKV2_AZURE_31

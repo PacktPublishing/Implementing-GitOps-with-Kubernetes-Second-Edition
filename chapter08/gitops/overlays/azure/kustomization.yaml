@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../base
+
+# Registry substitution. Replace the ACR name with the acr_login_server output
+# from iac/azure.
+#
+# The $imagepolicy markers are what make Flux image automation work: the Setters
+# strategy rewrites only lines that carry one. Without the markers the
+# ImageUpdateAutomation in flux/ reconciles happily and never changes anything.
+images:
+- name: weather-app
+  newName: gitopsch08XXXXXX.azurecr.io/weather-app
+  newTag: 2.0.3
+
+patches:
+- path: deployment-patch.yaml
+- path: serviceaccount-patch.yaml
+
+labels:
+- pairs:
+    cloud: azure

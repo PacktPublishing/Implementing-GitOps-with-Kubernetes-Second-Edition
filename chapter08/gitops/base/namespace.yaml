@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: weather-app
+  labels:
+    # Pod Security Admission. The base must satisfy the strictest profile so the
+    # same manifests pass policy on both clouds.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

@@ -1,0 +1,108 @@
+# Environment: prod. Mode: plan, then manual approval.
+#
+# Four things differ from dev, and all four are deliberate:
+#   1. approvePlan carries a plan id, not "auto". The controller plans on every
+#      interval but will not apply until this field matches the plan it
+#      generated. Changing it is a commit, so the approval is itself in Git.
+#   2. The source is infra-modules, pinned to a tag, not flux-system. Without
+#      that, the approval commit would move the revision the plan id is
+#      derived from and the approval would never match (tofu-controller#1878).
+#      See terraform/infra-modules-source.yaml.
+#   3. destroyResourcesOnDeletion is false. Deleting the custom resource then
+#      orphans the cloud resources rather than deleting them.
+#   4. State lives in an Azure storage account, not in a cluster Secret, so it
+#      survives the cluster, and CI can plan against it (see ci/).
+#
+# This object never reaches Ready on its own, by design. That is why the
+# infrastructure Kustomization health-checks dev-network and dev-data by name
+# rather than setting wait: true, which would health-check this one too and
+# hold the application layer behind a production approval.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: prod-network
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+
+  # Obtain the value with:
+  #   kubectl -n flux-system get tf/prod-network
+  # It has the form plan-infra-v1.0.0-<10 hex characters>. Copy it exactly --
+  # the controller compares the whole string -- and commit it to main.
+  # Leave empty ("") to hold everything at plan.
+  approvePlan: "plan-infra-v1.0.0-98a7a841f6"
+
+  path: ./chapter09/iac/azure/prod/network
+
+  sourceRef:
+    kind: GitRepository
+    name: infra-modules
+    namespace: flux-system
+
+  backendConfig:
+    customConfiguration: |
+      backend "azurerm" {
+        resource_group_name  = "gitops-tfstate-rg"
+        storage_account_name = "<tfstate-storage-account>"
+        container_name       = "tfstate"
+        key                  = "prod/network.tfstate"
+        use_oidc             = true
+        use_azuread_auth     = true
+      }
+
+  # The root carries an empty backend "azurerm" {} block (backend.tf) so that
+  # CI and a local cleanup can initialise against the same state. The
+  # controller writes this configuration to backend_override.tf, and override
+  # files replace a backend block rather than clashing with it. The key here
+  # must match the key= that ci/ and the README pass to `tofu init`.
+  #
+  # Storage account names are globally unique, so the value above cannot ship
+  # working. Take it from the bootstrap step:
+  #   tofu -chdir=chapter09/identity output -raw state_storage_account_name
+  # use_oidc and use_azuread_auth mean the backend authenticates with the same
+  # federated identity as the provider, so remote state does not reintroduce a
+  # storage account key. The bootstrap account sets
+  # shared_access_key_enabled = false, which makes that non-negotiable.
+
+  tfstate:
+    # Never "auto" in production. A stuck lock is a signal, not a nuisance.
+    forceUnlock: "no"
+
+  writeOutputsToSecret:
+    name: prod-network-outputs
+    outputs:
+      - resource_group_name
+      - location
+      - vnet_id
+      - private_endpoint_subnet_id
+
+  destroyResourcesOnDeletion: false
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        # Required by the Entra Workload ID webhook, which injects the projected
+        # service account token the azurerm provider reads.
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

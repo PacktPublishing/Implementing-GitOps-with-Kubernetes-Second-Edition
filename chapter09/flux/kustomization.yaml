@@ -1,0 +1,10 @@
+# Only the namespaces and the HelmRelease are reconciled from this directory.
+# flux-instance.yaml is applied once by the Flux Operator CLI and must not be
+# managed by Flux itself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Must exist before the chart renders a tf-runner ServiceAccount into them.
+  - namespaces.yaml
+  - tofu-controller.yaml

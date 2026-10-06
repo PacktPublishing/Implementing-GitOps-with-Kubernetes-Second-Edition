@@ -1,0 +1,44 @@
+# The source the production objects plan from.
+#
+# Same repository as flux-system, pinned to a release tag instead of following
+# main. This is what makes manual approval work in a monorepo.
+#
+# Why it is needed. Tofu Controller derives the plan id from the source
+# revision (plan-<ref>-<first 10 characters of the commit>), and v0.16.5
+# replans immediately before a manual apply, requiring the new id to equal the
+# approved one exactly. If the Terraform object and its HCL are served by the
+# same GitRepository, the commit that sets spec.approvePlan moves the revision,
+# the replan mints a new id, and the approval matches nothing. The loop never
+# ends. Tracked upstream as flux-iac/tofu-controller#1878; a fix is proposed in
+# #1890 but was not released at the time of writing.
+#
+# With this source, approving a plan changes main (where the manifest lives)
+# and leaves the planned revision alone, so the replan produces the same id and
+# the apply goes ahead. The price: a change to the HCL reaches production only
+# when ref.tag below is advanced, which is itself a one-line reviewed commit.
+#
+# Plan ids from this source look like:  plan-infra-v1.0.0-b8e362c206
+#
+# FORKING. Approvals are commits, so the walkthrough has to run against your
+# own fork. Change url here and sync.url in flux/flux-instance.yaml to point at
+# it, and make sure the tag exists there:
+#   git tag infra-v1.0.0 && git push origin infra-v1.0.0
+# Protect the infra-v* tag pattern the way you protect main: whoever can move
+# this tag can change what production plans.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: infra-modules
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+  ref:
+    tag: infra-v1.0.0
+  # Only needed if you point `url` at a private fork: reference a Secret
+  # holding a PAT scoped to that repository, e.g.
+  # secretRef:
+  #   name: gitops-ch08-auth
+  # Only the HCL is needed; keeps the artifact small.
+  sparseCheckout:
+    - chapter09/iac
