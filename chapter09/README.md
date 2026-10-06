@@ -64,12 +64,22 @@ chapter09/
 ├── gitops/            Application manifests that consume the infrastructure outputs
 ├── clusters/mgmt/     What the management cluster reconciles
 ├── policy/            Checkov configuration and Conftest policies
-└── ci/                Pull request gate: fmt, validate, scan, plan, policy
+├── ci/                Pull request gate: fmt, validate, scan, plan, policy
+└── first_edition/     Code from the first edition of the book, kept for reference
 ```
 
-> Move `ci/.github/workflows/ch09-iac-policy.yml` to `.github/workflows/` at the
-> repository root, because GitHub only reads workflows from there. It lives
-> under `ci/` here to keep the chapter self-contained.
+> **Where the workflow is.** The pull request gate is in
+> `chapter09/ci/.github/workflows/ch09-iac-policy.yml`. GitHub only reads workflows
+> from `.github/workflows/` at the repository root, so it is deliberately **not** active
+> in this repository. To run the exercises, work in your own fork (or copy of this
+> chapter) and copy it to its root:
+>
+> ```bash
+> mkdir -p .github/workflows
+> cp chapter09/ci/.github/workflows/ch09-iac-policy.yml .github/workflows/
+> ```
+>
+> Then create the three repository variables listed at the top of the workflow file.
 
 ### What the cluster reconciles, and what it does not
 

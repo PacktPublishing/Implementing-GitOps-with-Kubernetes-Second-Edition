@@ -59,12 +59,22 @@ chapter08/
 ├── ci/
 │   ├── .github/workflows/   Keyless build workflows (copy to the repo root)
 │   └── legacy/              Azure Pipelines and CodeBuild, deploy stages removed
-└── observability/           Portable Prometheus rules for both clouds
+├── observability/           Portable Prometheus rules for both clouds
+└── first_edition/           Code from the first edition of the book, kept for reference
 ```
 
-> Move `ci/.github/workflows/*` to `.github/workflows/` at the repository root,
-> because GitHub only reads workflows from there. They live under `ci/` here to keep the
-> chapter self-contained.
+> **Where the workflows are.** The GitHub Actions workflows are in
+> `chapter08/ci/.github/workflows/` (`ch08-build-azure.yml` and `ch08-build-aws.yml`).
+> GitHub only reads workflows from `.github/workflows/` at the repository root, so they
+> are deliberately **not** active in this repository. To run the exercises, work in your
+> own fork (or copy of this chapter) and copy them to its root:
+>
+> ```bash
+> mkdir -p .github/workflows
+> cp chapter08/ci/.github/workflows/*.yml .github/workflows/
+> ```
+>
+> The Azure workflow also needs the repository variables created in section 1.3.
 
 ---
 
