@@ -1,0 +1,12 @@
+---
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata:
+  name: update
+policies:
+  - name: application-prevent-updates-project
+    resources:
+      - name: test
+        values:
+          oldObject.spec.project: default
+          request.operation: UPDATE

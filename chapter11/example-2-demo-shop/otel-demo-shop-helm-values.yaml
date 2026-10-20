@@ -1,0 +1,16 @@
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+jaeger:
+  enabled: false
+opensearch:
+  enabled: false
+
+components:
+  load-generator:
+    envOverrides:
+      - name: LOCUST_HOST
+        value: "https://shop.hub-dev.stackit.run"
+      - name: LOCUST_USERS
+        value: "10"

@@ -1,0 +1,53 @@
+---
+letsencrypt: true
+clusterIssuer:
+  name: ''
+  email: ''
+  server: ''
+  ingressClassName: ''
+  customDefinition: {}
+cert-manager:
+  extraArgs:
+    - --logging-format=json
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      memory: 100Mi
+  prometheus:
+    servicemonitor:
+      enabled: true
+  installCRDs: true
+  serviceAccount:
+    automountServiceAccountToken: true
+  webhook:
+    extraArgs:
+      - --logging-format=json
+    timeoutSeconds: 15  # set timeout to 15 seconds because of gardener, see: https://github.com/gardener/gardener/blob/master/docs/usage/shoot/shoot_status.md#constraints
+    resources:
+      requests:
+        cpu: 10m
+        memory: 100Mi
+      limits:
+        memory: 100Mi
+  cainjector:
+    extraArgs:
+      - --logging-format=json
+    resources:
+      requests:
+        cpu: 10m
+        memory: 150Mi
+      limits:
+        memory: 150Mi
+  startupapicheck:
+    extraArgs:
+      - -v
+      - --logging-format=json
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 32Mi
+namespace: {}

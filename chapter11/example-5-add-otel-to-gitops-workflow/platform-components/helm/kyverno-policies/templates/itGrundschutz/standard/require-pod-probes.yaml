@@ -1,0 +1,75 @@
+{{- if and .Values.itGrundschutz.standard.enabled (dig "itGrundschutz" "standard" "requirePodProbes" "enabled" true (merge .Values)) }}
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-pod-probes
+  annotations:
+    policies.kyverno.io/title: Require Pod Probes
+    policies.kyverno.io/category: IT-Grundschutz (standard)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/minversion: "1.17.0"
+    kyverno.io/kyverno-version: {{ .Values.global.kyvernoVersion | quote }}
+    kyverno.io/kubernetes-version: {{ .Values.global.k8sVersion | quote }}
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Liveness and readiness probes need to be configured to correctly manage a Pod's
+      lifecycle during deployments, restarts, and upgrades. For each Pod, a periodic
+      `livenessProbe` is performed by the kubelet to determine if the Pod's containers
+      are running or need to be restarted. A `readinessProbe` is used by Services
+      and Deployments to determine if the Pod is ready to receive network traffic.
+      This policy validates that all containers have one of livenessProbe, readinessProbe,
+      or startupProbe defined.
+spec:
+  failurePolicy: {{ dig "itGrundschutz" "standard" "requirePodProbes" "webhookFailurePolicy" "Fail" (merge .Values) }}
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: {{ dig "itGrundschutz" "standard" "requirePodProbes" "enableBackgroundScanning" true (merge .Values) }}
+  validationActions:
+    - {{ $action := dig "itGrundschutz" "standard" "requirePodProbes" "actionOverride" "Audit" (merge .Values) }}{{ if eq $action "Enforce" }}Deny{{ else }}{{ $action }}{{ end }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+          - cronjobs
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec :
+        object.spec.template.spec
+  validations:
+    - expression: >-
+        variables.podSpec.?containers.orValue([]).all(c,
+          has(c.livenessProbe) || has(c.readinessProbe) || has(c.startupProbe)
+        )
+      message: "Liveness, readiness, or startup probes are required for all containers."
+{{- end }}

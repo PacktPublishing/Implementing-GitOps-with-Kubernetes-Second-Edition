@@ -1,0 +1,23 @@
+tempo:
+  tempo:
+    retention: 168h
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    metricsGenerator:
+      enabled: false
+  persistence:
+    enabled: true
+    size: 10Gi
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      monitoring.instance: hub-dev
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi

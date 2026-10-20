@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shop-availability-slo
+  namespace: shop
+  labels:
+    release: kube-prometheus-stack
+    monitoring.instance: hub-dev
+spec:
+  groups:
+    - name: shop-slo-recording
+      interval: 30s
+      rules:
+        - record: slo:sli_error:ratio_rate5m
+          labels:
+            service: shop
+          expr: |
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes", code=~"5.."}[5m]))
+            /
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes"}[5m]))
+        - record: slo:sli_error:ratio_rate1h
+          labels:
+            service: shop
+          expr: |
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes", code=~"5.."}[1h]))
+            /
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes"}[1h]))
+        - record: slo:sli_error:ratio_rate6h
+          labels:
+            service: shop
+          expr: |
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes", code=~"5.."}[6h]))
+            /
+            sum(rate(traefik_service_requests_total{exported_service="shop-shop-80@kubernetes"}[6h]))
+        - record: slo:objective:ratio
+          labels:
+            service: shop
+          expr: vector(0.995)
+        - record: slo:error_budget:ratio
+          labels:
+            service: shop
+          expr: 1 - 0.995
+    - name: shop-slo-alerts
+      rules:
+        - alert: ShopErrorBudgetBurnFast
+          expr: |
+            slo:sli_error:ratio_rate5m{service="shop"} > (14.4 * 0.005)
+            and
+            slo:sli_error:ratio_rate1h{service="shop"} > (14.4 * 0.005)
+          for: 2m
+          labels:
+            severity: critical
+            service: shop
+          annotations:
+            summary: "Shop is burning its 30 day error budget at 14x speed"
+            runbook: https://git.example.com/runbooks/shop-slo
+        - alert: ShopErrorBudgetBurnSlow
+          expr: |
+            slo:sli_error:ratio_rate1h{service="shop"} > (6 * 0.005)
+            and
+            slo:sli_error:ratio_rate6h{service="shop"} > (6 * 0.005)
+          for: 15m
+          labels:
+            severity: warning
+            service: shop
+          annotations:
+            summary: "Shop is burning its 30 day error budget at 6x speed"

@@ -1,0 +1,15 @@
+uptime-kuma:
+  fullnameOverride: uptime-kuma
+  volume:
+    enabled: true
+    size: 4Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  serviceMonitor:
+    enabled: false
+  ingress:
+    enabled: false

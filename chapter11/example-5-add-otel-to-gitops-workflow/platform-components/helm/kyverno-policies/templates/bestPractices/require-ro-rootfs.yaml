@@ -1,0 +1,73 @@
+{{- if and .Values.bestPractices.enabled (dig "bestPractices" "requireReadOnlyRootFilesystem" "enabled" true (merge .Values)) }}
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-readonly-root-filesystem
+  annotations:
+    policies.kyverno.io/title: Require Read-Only Root Filesystem
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/minversion: "1.17.0"
+    kyverno.io/kyverno-version: {{ .Values.global.kyvernoVersion | quote }}
+    kyverno.io/kubernetes-version: {{ .Values.global.k8sVersion | quote }}
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      A read-only root file system helps to enforce an immutable infrastructure strategy;
+      the container only needs to write on the mounted volume that persists the state.
+      An immutable root filesystem can also prevent malicious binaries from writing to the
+      host system. This policy validates that containers define a securityContext
+      with `readOnlyRootFilesystem: true`.
+spec:
+  failurePolicy: {{ dig "bestPractices" "requireReadOnlyRootFilesystem" "webhookFailurePolicy" "Fail" (merge .Values) }}
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: {{ dig "bestPractices" "requireReadOnlyRootFilesystem" "enableBackgroundScanning" true (merge .Values) }}
+  validationActions:
+    - {{ $action := dig "bestPractices" "requireReadOnlyRootFilesystem" "actionOverride" "Audit" (merge .Values) }}{{ if eq $action "Enforce" }}Deny{{ else }}{{ $action }}{{ end }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+          - cronjobs
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec :
+        object.spec.template.spec
+  validations:
+    - expression: >-
+        variables.podSpec.?containers.orValue([]).all(c,
+          has(c.securityContext) && c.securityContext.?readOnlyRootFilesystem.orValue(false) == true
+        )
+      message: "Root filesystem must be read-only (securityContext.readOnlyRootFilesystem: true)."
+{{- end }}

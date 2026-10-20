@@ -1,0 +1,9 @@
+apiVersion: v2
+name: tempo
+description: Umbrella chart for Grafana Tempo (trace backend)
+type: application
+version: 1.0.0
+dependencies:
+  - name: tempo
+    repository: https://grafana.github.io/helm-charts
+    version: 1.24.4

@@ -1,0 +1,175 @@
+# PrometheusRule: monitor Argo CD as the GitOps engine
+#
+# Group 1 (argocd-applications): state of the Applications – "does Git reach the cluster?"
+# Group 2 (argocd-operations):   state of Argo CD itself – "is the engine working?"
+#
+# Labels match hub-dev (ruleSelector on release / monitoring.instance).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: argocd-gitops-alerts
+  namespace: kube-prometheus-stack
+  labels:
+    release: kube-prometheus-stack
+    monitoring.instance: hub-dev
+spec:
+  groups:
+    # ------------------------------------------------------------------
+    # 1. Applications: sync and health status
+    # ------------------------------------------------------------------
+    - name: argocd-applications
+      rules:
+        # Auto-sync is enabled, yet the cluster differs from Git
+        # -> sync keeps failing, a hook is stuck or ignoreDifferences is missing.
+        - alert: ArgoAppOutOfSync
+          expr: |
+            argocd_app_info{sync_status="OutOfSync", autosync_enabled="true"} == 1
+          for: 30m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "{{ $labels.name }} has been OutOfSync for 30 minutes despite auto-sync"
+            description: "Application {{ $labels.name }} (project {{ $labels.project }}) does not match Git although auto-sync is enabled. Check the last sync operation and diff in Argo CD."
+
+        # Manual sync: drift is expected, but should not linger forever.
+        - alert: ArgoAppOutOfSyncManual
+          expr: |
+            argocd_app_info{sync_status="OutOfSync", autosync_enabled="false"} == 1
+          for: 24h
+          labels:
+            severity: info
+            team: platform
+          annotations:
+            summary: "{{ $labels.name }} has pending changes from Git for more than 24 hours"
+            description: "Application {{ $labels.name }} uses manual sync and has been OutOfSync for 24h. Either sync it or revert the change in Git."
+
+        # Workload is broken (CrashLoop, failed rollout, ...).
+        - alert: ArgoAppDegraded
+          expr: |
+            argocd_app_info{health_status="Degraded"} == 1
+          for: 10m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "{{ $labels.name }} in project {{ $labels.project }} is Degraded"
+            description: "Application {{ $labels.name }} (destination namespace {{ $labels.dest_namespace }}) has been Degraded for 10 minutes. Often caused by the last deployment – check the sync history and consider a git revert."
+
+        # Resources from Git are missing in the cluster (e.g. deleted manually, never synced).
+        - alert: ArgoAppMissing
+          expr: |
+            argocd_app_info{health_status="Missing"} == 1
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "{{ $labels.name }} has resources missing in the cluster"
+            description: "Application {{ $labels.name }} reports health status Missing for 15 minutes."
+
+        # Rollout is stuck: Progressing is normal, but only for a short time.
+        - alert: ArgoAppProgressingTooLong
+          expr: |
+            argocd_app_info{health_status="Progressing"} == 1
+          for: 30m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "{{ $labels.name }} has been Progressing for 30 minutes"
+            description: "The rollout of {{ $labels.name }} does not finish. Check pending pods, image pulls and readiness probes."
+
+        # Argo CD cannot determine the state (manifest generation broken, repo unreachable).
+        - alert: ArgoAppUnknown
+          expr: |
+            argocd_app_info{sync_status="Unknown"} == 1
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Argo CD cannot determine the sync status of {{ $labels.name }}"
+            description: "Sync status Unknown for 15 minutes. Usually a ComparisonError: broken Helm/Kustomize render or unreachable repository {{ $labels.repo }}."
+
+        # Individual failed sync operations – fires immediately, resolves itself after 15 min.
+        - alert: ArgoAppSyncFailed
+          expr: |
+            sum by (name, project, phase) (
+              increase(argocd_app_sync_total{phase=~"Error|Failed"}[15m])
+            ) > 0
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Sync of {{ $labels.name }} failed ({{ $labels.phase }})"
+            description: "{{ $value | humanize }} failed sync operation(s) for {{ $labels.name }} in the last 15 minutes."
+
+    # ------------------------------------------------------------------
+    # 2. Argo CD itself: components, clusters, repo, notifications
+    # ------------------------------------------------------------------
+    - name: argocd-operations
+      rules:
+        # An Argo CD component is no longer scraped (pod down or metrics endpoint gone).
+        # Adjust the job regex to the service names of your chart if needed: count by (job) (up{job=~".*argocd.*"})
+        - alert: ArgoCDComponentDown
+          expr: |
+            up{job=~".*argocd.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Argo CD component {{ $labels.job }} is down"
+            description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}) for 5 minutes. Without the application controller nothing gets synced."
+
+        # Argo CD can no longer reach a target cluster -> nothing gets deployed there.
+        - alert: ArgoCDClusterConnectionLost
+          expr: |
+            argocd_cluster_connection_status == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Argo CD lost the connection to cluster {{ $labels.server }}"
+            description: "Deployments to {{ $labels.server }} are blocked. Check credentials, network and API server availability."
+
+        # Reconciliation backs up -> changes from Git arrive late (lead time increases).
+        - alert: ArgoCDReconcileQueueBacklog
+          expr: |
+            sum by (name) (workqueue_depth{job=~".*argocd.*", name=~"app_reconciliation_queue|app_operation_processing_queue"}) > 50
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Argo CD queue {{ $labels.name }} has a backlog of {{ $value }} items"
+            description: "The application controller cannot keep up. Consider more processors (controller.status.processors / operation.processors) or sharding."
+
+        # Slow reconciliation (P95) -> controller overloaded or repo server slow.
+        - alert: ArgoCDReconcileSlow
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(argocd_app_reconcile_bucket[15m]))
+            ) > 10
+          for: 30m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Argo CD reconciliation P95 is {{ $value | humanizeDuration }}"
+            description: "Reconciliation takes longer than 10s at P95 for 30 minutes."
+
+        # Notifications are not delivered -> also affects the DORA pipeline (webhook -> Loki).
+        - alert: ArgoCDNotificationDeliveryFailed
+          expr: |
+            sum by (notifier, trigger) (
+              increase(argocd_notifications_deliveries_total{succeeded="false"}[15m])
+            ) > 0
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Argo CD notifications via {{ $labels.notifier }} are failing"
+            description: "{{ $value | humanize }} failed deliveries for trigger {{ $labels.trigger }} in the last 15 minutes. DORA events may be missing."

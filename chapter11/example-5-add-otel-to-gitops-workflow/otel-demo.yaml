@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-demo
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: default
+  namespace: otel-demo
+spec:
+  exporter:
+    endpoint: http://opentelemetry-collector.opentelemetry-collector.svc:4318
+  env:
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: http/protobuf
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1.0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-app
+  namespace: otel-demo
+data:
+  server.js: |
+    const http = require('http');
+    http.createServer((req, res) => {
+      const delay = Math.floor(Math.random() * 200);
+      setTimeout(() => {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('hello from otel-demo\n');
+      }, delay);
+    }).listen(8080, () => console.log('listening on 8080'));
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+  namespace: otel-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "otel-demo/default"
+    spec:
+      containers:
+        - name: hello
+          image: node:22-slim
+          command: ["node", "/app/server.js"]
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+          volumeMounts:
+            - name: app
+              mountPath: /app
+      volumes:
+        - name: app
+          configMap:
+            name: hello-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  namespace: otel-demo
+spec:
+  selector:
+    app: hello
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: otel-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.10.1
+          command: ["sh", "-c", "while true; do curl -s http://hello.otel-demo.svc/ >/dev/null; sleep 1; done"]
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi

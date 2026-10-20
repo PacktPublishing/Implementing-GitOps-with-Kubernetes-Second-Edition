@@ -1,0 +1,17 @@
+---
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: traefik-cluster-admin
+policies:
+  - /tmp/kyverno-traefik.yaml
+resources:
+  - ../resources/tlsoptions.yaml
+userinfo: user_info.yaml
+results:
+  # skip because admin skips the rule
+  - policy: disallow-default-tlsoptions
+    resources:
+      - default
+    kind: TLSOption
+    result: skip

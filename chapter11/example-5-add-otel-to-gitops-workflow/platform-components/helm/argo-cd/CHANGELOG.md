@@ -1,0 +1,248 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.11.2] - 2026-10-09
+### Changed
+- Updated chart dependency version: argo-cd 10.10.1 → 10.10.2
+
+## [1.11.1] - 2026-10-08
+### Changed
+- Updated chart dependency version: argo-cd 10.10.0 → 10.10.1
+
+## [1.11.0] - 2026-10-07
+### Changed
+- Updated chart dependency version: argo-cd 10.9.7 → 10.10.0
+
+## [1.10.7] - 2026-10-07
+### Changed
+- Updated chart dependency version: argo-cd 10.9.6 → 10.9.7
+
+## [1.10.5] - 2026-10-01
+### Changed
+- Updated chart dependency version: argo-cd 10.9.5 → 10.9.6
+
+## [1.10.4] - 2026-09-30
+### Changed
+- Updated chart dependency version: argo-cd 10.9.4 → 10.9.5
+
+## [1.10.3] - 2026-09-29
+### Changed
+- Updated chart dependency version: argo-cd 10.9.2 → 10.9.4
+
+## [1.10.2] - 2026-09-17
+### Changed
+- Updated chart dependency version: argo-cd 10.9.1 → 10.9.2
+
+## [1.10.1] - 2026-09-14
+### Changed
+- Updated chart dependency version: argo-cd 10.9.0 → 10.9.1
+
+## [1.10.0] - 2026-09-11
+### Changed
+- Updated chart dependency version: argo-cd 10.8.4 → 10.9.0
+
+## [1.9.3] - 2026-09-09
+### Changed
+- Updated chart dependency version: argo-cd 10.8.2 → 10.8.4
+
+## [1.9.2] - 2026-09-07
+### Changed
+- Updated chart dependency version: argo-cd 10.8.1 → 10.8.2
+
+## [1.9.1] - 2026-09-07
+### Changed
+- Updated chart dependency version: argo-cd 10.8.0 → 10.8.1
+
+## [1.9.0] - 2026-09-04
+### Changed
+- Updated chart dependency version: argo-cd 10.7.2 → 10.8.0
+
+## [1.8.2] - 2026-09-04
+### Changed
+- Updated chart dependency version: argo-cd 10.7.1 → 10.7.2
+
+## [1.8.1] - 2026-09-03
+### Changed
+- Updated chart dependency version: argo-cd 10.7.0 → 10.7.1
+
+## [1.8.0] - 2026-09-02
+### Changed
+- Updated chart dependency version: argo-cd 10.6.4 → 10.7.0
+
+## [1.7.2] - 2026-09-02
+### Changed
+- Updated chart dependency version: argo-cd 10.6.3 → 10.6.4
+
+## [1.7.1] - 2026-09-02
+### Changed
+- Updated chart dependency version: argo-cd 10.6.0 → 10.6.3
+
+## [1.7.0] - 2026-09-01
+### Changed
+- Updated chart dependency version: argo-cd 10.4.2 → 10.6.0
+
+## [1.6.0] - 2026-08-31
+### Changed
+- Removed the template-library dependency and made Argo CD templates local to this chart.
+
+## [1.5.2] - 2026-08-29
+### Changed
+- Updated chart dependency version: argo-cd 10.4.1 → 10.4.2
+
+## [1.5.1] - 2026-08-28
+### Changed
+- Updated chart dependency version: argo-cd 10.4.0 → 10.4.1
+
+## [1.5.0] - 2026-08-17
+### Changed
+- Updated chart dependency version: argo-cd 10.3.3 → 10.4.0
+
+## [1.4.3] - 2026-08-13
+### Changed
+- Updated chart dependency version: argo-cd 10.3.2 → 10.3.3
+
+## [1.4.2] - 2026-08-11
+### Changed
+- Updated chart dependency version: template-library 0.2.0 → 0.2.1
+
+## [1.4.1] - 2026-08-10
+### Changed
+- Updated chart dependency version: argo-cd 10.3.0 → 10.3.2
+
+## [1.4.0] - 2026-08-07
+### Changed
+- Updated chart dependency version: argo-cd 10.2.1 → 10.3.0
+
+## [1.3.0] - 2026-07-27
+### Changed
+- Updated chart dependency version: argo-cd 10.1.3 → 10.2.1
+
+## [1.2.0] - 2026-07-10
+### Changed
+- Bump template-library dependency to 0.2.0 for bearerToken authentication support
+
+## [1.1.0] - 2026-07-10
+### Changed
+- Updated chart dependency version: argo-cd 10.0.0 → 10.1.3
+
+## [1.0.0] - 2026-06-29
+### Changed
+- Updated chart dependency version: argo-cd 9.5.21 → 10.0.0
+
+## [0.7.7] - 2026-06-12
+### Changed
+- Updated chart dependency version: argo-cd 9.5.17 → 9.5.21
+
+## [0.7.6] - 2026-06-01
+### Changed
+- Updated chart dependency version: argo-cd 9.5.15 → 9.5.17
+
+## [0.7.5] - 2026-05-25
+### Changed
+- Updated chart dependency version: argo-cd 9.5.14 → 9.5.15
+
+## [0.7.4] - 2026-05-17
+### Changed
+- Updated chart dependency version: argo-cd 9.5.11 → 9.5.14
+
+## [0.7.3] - 2026-05-04
+### Changed
+- Updated chart dependency version: argo-cd 9.5.9 → 9.5.11
+
+## [0.7.2] - 2026-04-30
+### Changed
+- Updated chart dependency version: argo-cd 9.5.2 → 9.5.9
+
+## [0.7.1] - 2026-04-20
+### Changed
+- Updated chart dependency version: argo-cd 9.5.0 → 9.5.2
+
+## [0.7.0] - 2026-04-13
+### Changed
+- Updated chart dependency version: argo-cd 9.4.17 → 9.5.0
+
+## [0.6.7] - 2026-03-30
+### Changed
+- Updated chart dependency version: argo-cd 9.4.15 → 9.4.17
+
+## [0.6.6] - 2026-03-23
+### Changed
+- Updated chart dependency version: argo-cd 9.4.14 → 9.4.15
+
+## [0.6.5] - 2026-03-19
+### Changed
+- Updated chart dependency version: argo-cd 9.4.10 → 9.4.14
+
+## [0.6.4] - 2026-03-10
+### Changed
+- Updated chart dependency version: argo-cd 9.4.9 → 9.4.10
+
+## [0.6.3] - 2026-03-09
+### Changed
+- Updated chart dependency version: argo-cd 9.4.7 → 9.4.9
+
+## [0.6.2] - 2026-03-04
+### Changed
+- Updated chart dependency version: argo-cd 9.4.4 → 9.4.7
+
+## [0.6.1] - 2026-02-23
+### Changed
+- Updated chart dependency version: argo-cd 9.4.1 → 9.4.4
+
+## [0.6.0] - 2026-02-05
+### Changed
+- Updated chart dependency version: template-library 0.0.4 → 0.0.5
+- Switch loop for calls to template-library from list to dict
+
+## [0.5.1] - 2026-02-05
+### Changed
+- Updated chart dependency version: argo-cd 9.4.0 → 9.4.1
+
+## [0.5.0] - 2026-02-03
+### Changed
+- Updated chart dependency version: argo-cd 9.2.4 → 9.4.0
+
+## [0.4.1] - 2026-01-08
+### Changed
+- Use consistent naming scheme for change-me value 
+
+## [0.4.0] - 2026-01-03
+### Changed
+- Updated chart dependency version: argo-cd 9.1.5 → 9.2.4
+
+## [0.3.0] - 2025-12-01
+### Changed
+- Updated chart dependency version: argo-cd 9.0.5 → 9.1.5
+
+## [0.2.2] - 2025-11-13
+### Fixed
+- Added filetype suffix to template
+
+## [0.2.1] - 2025-10-25
+### Changed
+- Updated chart dependency version: argo-cd 9.0.3 → 9.0.5
+
+## [1.0.0] - 2025-10-21
+### Changed
+- Updated chart dependency version: argo-cd 8.5.6 → 9.0.3
+
+## [0.1.1] - 2025-09-29
+### Fixed
+- ensure default project description stays within new 255 char limit
+
+## [0.1.0] - 2025-09-24
+### Changed
+- Updated chart dependency version: argo-cd 8.3.5 → 8.5.6
+
+## [0.0.2] - 2025-09-15
+### Fixed
+- file suffix in templates directory
+### Changed
+- upgrade argo-cd and template-library dependency chart versions
+
+## [0.0.1] - 2025-04-28
+### Added
+- Initial blueprint version

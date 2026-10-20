@@ -1,0 +1,6 @@
+apiVersion: kubara.io/v1alpha1
+kind: Catalog
+metadata:
+  name: my-catalog
+spec:
+  version: 0.1.0

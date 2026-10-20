@@ -1,0 +1,78 @@
+---
+namespace: {}
+kyverno:
+  global:
+    crdWatcher: true
+  features:
+    logging:
+      format: json
+  crds:
+    migration:
+      podResources:
+        limits:
+          cpu: 100m
+          memory: 256Mi
+        requests:
+          cpu: 10m
+          memory: 64Mi
+  test:
+    resources:
+      limits:
+        cpu:
+        memory: 256Mi
+      requests:
+        cpu: 10m
+        memory: 256Mi
+  webhooksCleanup:
+    resources:
+      limits:
+        cpu:
+        memory: 256Mi
+      requests:
+        cpu: 10m
+        memory: 256Mi
+  admissionController:
+    initContainer:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 256Mi
+        limits:
+          cpu:
+          memory: 256Mi
+    container:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 384Mi
+        limits:
+          memory: 384Mi
+    serviceMonitor:
+      enabled: true
+  backgroundController:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 128Mi
+    serviceMonitor:
+      enabled: true
+  cleanupController:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 128Mi
+    serviceMonitor:
+      enabled: true
+  reportsController:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 128Mi
+    serviceMonitor:
+      enabled: true
