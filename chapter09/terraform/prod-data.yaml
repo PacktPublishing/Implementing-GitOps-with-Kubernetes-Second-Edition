@@ -1,0 +1,83 @@
+# Environment: prod. Mode: plan, then manual approval.
+#
+# The production data plane. Same posture as prod-network: a pinned source,
+# manual approval, remote state, and deletion that orphans rather than
+# destroys. It depends on prod-network, so it stays Unknown until the network
+# plan has been approved and applied and prod-network-outputs exists.
+#
+# Two approvals are therefore needed the first time through: network, then
+# data. Each is its own reviewable commit.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: prod-data
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+
+  # Obtain with: kubectl -n flux-system get tf/prod-data
+  # Form: plan-infra-v1.0.0-<10 hex characters>. Leave "" to hold at plan.
+  approvePlan: ""
+
+  path: ./chapter09/iac/azure/prod/data
+
+  sourceRef:
+    kind: GitRepository
+    name: infra-modules
+    namespace: flux-system
+
+  dependsOn:
+    - name: prod-network
+
+  varsFrom:
+    - kind: Secret
+      name: prod-network-outputs
+
+  backendConfig:
+    customConfiguration: |
+      backend "azurerm" {
+        resource_group_name  = "gitops-tfstate-rg"
+        storage_account_name = "<tfstate-storage-account>"
+        container_name       = "tfstate"
+        key                  = "prod/data.tfstate"
+        use_oidc             = true
+        use_azuread_auth     = true
+      }
+
+  tfstate:
+    forceUnlock: "no"
+
+  writeOutputsToSecret:
+    name: prod-data-outputs
+    outputs:
+      - storage_account_name
+      - blob_endpoint
+
+  destroyResourcesOnDeletion: false
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

@@ -1,0 +1,22 @@
+# Installs the controller before anything tries to create a Terraform object.
+# Without this the infra.contrib.fluxcd.io CRD never exists and every custom
+# resource in chapter09/terraform fails to apply with "no matches for kind".
+#
+# wait: true is correct here and deliberate: this Kustomization applies a
+# HelmRepository and a HelmRelease and nothing else, so health-checking every
+# resource it reconciled is exactly what we want. Compare with
+# infrastructure.yaml, where it would be wrong.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tofu-controller
+  namespace: flux-system
+spec:
+  interval: 1h
+  prune: true
+  path: ./chapter09/flux
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  timeout: 10m

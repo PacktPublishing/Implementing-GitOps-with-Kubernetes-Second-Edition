@@ -1,0 +1,58 @@
+name: ch08-build-aws
+
+# The AWS counterpart. Same principle: build, push, stop. Argo CD reconciles.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'chapter08/src/**'
+      - '.github/workflows/ch08-build-aws.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-central-1
+  IMAGE_NAME: weather-app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive image tag
+        id: meta
+        run: echo "tag=2.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      # Assumes the IAM role created in iac/aws/identity.tf. No access key, no
+      # secret key, no long-lived credential in GitHub.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: chapter08/src
+          file: chapter08/src/Dockerfile
+          push: true
+          # The ECR repository is created with IMMUTABLE tags, so a re-run cannot
+          # silently replace an image that a cluster is already running.
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

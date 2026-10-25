@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-app
+  namespace: weather-app
+spec:
+  template:
+    metadata:
+      labels:
+        # Instructs the Entra Workload ID webhook to project a federated token.
+        azure.workload.identity/use: "true"
+    spec:
+      containers:
+        - name: weather-app
+          env:
+            - name: CLOUD_PROVIDER
+              value: azure

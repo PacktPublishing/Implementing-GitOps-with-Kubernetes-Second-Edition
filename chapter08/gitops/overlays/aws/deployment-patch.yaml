@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-app
+  namespace: weather-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: weather-app
+          env:
+            - name: CLOUD_PROVIDER
+              value: aws
+# Note: EKS Pod Identity does NOT require automountServiceAccountToken. The agent
+# injects a separate projected volume (audience pods.eks.amazonaws.com) together
+# with AWS_CONTAINER_CREDENTIALS_FULL_URI, and that injection is independent of
+# the default service-account token. The base therefore keeps automounting off on
+# both clouds.

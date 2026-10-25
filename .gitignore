@@ -80,3 +80,9 @@ out/
 /go.sum
 /go.mod
 bin/
+**/*.tfplan
+**/azureplan
+**/awsplan
+**/tfplan
+**/plan.json
+**/terraform.tfvars

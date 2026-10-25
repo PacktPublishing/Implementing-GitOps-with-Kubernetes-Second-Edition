@@ -1,0 +1,71 @@
+# The second half of the dependency pair. Nothing here names a resource group,
+# a virtual network or a subnet: those values arrive from the Secret that
+# dev-network wrote.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: dev-data
+  namespace: flux-system
+spec:
+  interval: 5m
+  approvePlan: auto
+  path: ./chapter09/iac/azure/dev/data
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+
+  # Controller-level dependency, not an HCL one. dev-data stays Unknown and is
+  # retried every retryInterval until dev-network has applied and written its
+  # outputs Secret. Each module still reconciles on its own interval and can
+  # fail without taking the other down.
+  dependsOn:
+    - name: dev-network
+  retryInterval: 20s
+
+  # Every key in the Secret becomes a Terraform variable of the same name,
+  # which is why the network module's output names and the data module's
+  # variable names were chosen to match. Use varsKeys to select or rename:
+  #   varsKeys:
+  #     - resource_group_name
+  #     - private_endpoint_subnet_id
+  varsFrom:
+    - kind: Secret
+      name: dev-network-outputs
+
+  writeOutputsToSecret:
+    name: dev-data-outputs
+    outputs:
+      - storage_account_name
+      - blob_endpoint
+
+  destroyResourcesOnDeletion: true
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        # Required by the Entra Workload ID webhook, which injects the projected
+        # service account token the azurerm provider reads.
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

@@ -1,0 +1,60 @@
+# Detecting drift is not the same as knowing about it. Without a Provider and
+# an Alert, a drift condition is a field on an object nobody reads.
+#
+# One constraint shapes this file. Alert.spec.eventSources[].kind is a closed
+# enumeration of Flux kinds -- Bucket, GitRepository, Kustomization, HelmRelease,
+# HelmChart, HelmRepository, ImageRepository, ImagePolicy, ImageUpdateAutomation,
+# OCIRepository, ArtifactGenerator, ExternalArtifact. Terraform is not among
+# them, so an Alert cannot subscribe to Terraform objects directly and a
+# manifest that tries is rejected by the API server. What we subscribe to
+# instead is the Kustomization that owns them: because it health-checks
+# dev-network and dev-data, a module that fails to reconcile fails the
+# Kustomization, and that is what reaches the channel.
+#
+# Two limits worth knowing:
+#   * Only health-checked objects count. The staging and production objects
+#     are deliberately not in the health checks (production holds at plan by
+#     design), so a production plan waiting for approval never reaches this
+#     channel. Check `kubectl get tf -A` or add a separate Kustomization for
+#     the production objects with its own health checks if you want that.
+#   * It is late. An object waiting on a plan is not failed but in progress
+#     (Ready=Unknown), so a health check reports it only when the
+#     Kustomization's timeout expires.
+#
+# What this does not give you is the drift detail itself in the message. For
+# that, follow the link back to the object and read its conditions. The
+# controller can expose Prometheus metrics, but metrics.enabled defaults to
+# false in the chart (see flux/tofu-controller.yaml).
+#
+# This file lives outside chapter09/terraform on purpose: a rejected resource
+# fails the whole Kustomization apply, and a notification problem should never
+# be able to break provisioning.
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: infra-alerts
+  namespace: flux-system
+spec:
+  type: slack
+  channel: platform-infra
+  secretRef:
+    name: slack-webhook
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: infra-reconciliation
+  namespace: flux-system
+spec:
+  providerRef:
+    name: infra-alerts
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: infrastructure
+      namespace: flux-system
+  # Routine progress is not a notification. Suppress it and keep the events
+  # that mean somebody has to look.
+  exclusionList:
+    - "Reconciliation in progress"

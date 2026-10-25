@@ -1,0 +1,59 @@
+# Environment: dev. Mode: GitOps Automation (plan and apply without a human).
+# Appropriate here because dev is disposable and the feedback loop matters more
+# than the gate.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: dev-network
+  namespace: flux-system
+spec:
+  interval: 5m
+  approvePlan: auto
+  path: ./chapter09/iac/azure/dev/network
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+
+  # Outputs become keys in this Secret. dev-data reads them back with varsFrom,
+  # which is why these names match the data root's variable names exactly.
+  writeOutputsToSecret:
+    name: dev-network-outputs
+    outputs:
+      - resource_group_name
+      - location
+      - vnet_id
+      - private_endpoint_subnet_id
+
+  # Deleting this object destroys the infrastructure it created. Deliberate in
+  # dev, dangerous in prod: see terraform/prod-network.yaml.
+  destroyResourcesOnDeletion: true
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        # Required by the Entra Workload ID webhook, which injects the projected
+        # service account token the azurerm provider reads.
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

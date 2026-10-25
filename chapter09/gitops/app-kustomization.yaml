@@ -1,0 +1,40 @@
+# The join between the infrastructure layer and the application layer.
+#
+# dependsOn holds the application back until the infrastructure Kustomization
+# reports ready, and the values themselves arrive through
+# postBuild.substituteFrom. A Terraform object is not a Kustomization, so the
+# wait is expressed on the infra Kustomization that owns it.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: weather-app
+  namespace: flux-system
+spec:
+  interval: 10m
+  prune: true
+  path: ./chapter09/gitops/app
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  dependsOn:
+    - name: infrastructure
+
+  postBuild:
+    substituteFrom:
+      - kind: Secret
+        name: dev-data-outputs
+        # Until dev-data has written the Secret, this Kustomization fails
+        # rather than deploying an application pointed at nothing.
+        optional: false
+
+  # "Applied" is not "ready": without a health check the Kustomization reports
+  # success the moment the API server accepts the manifest. Naming the
+  # Deployment is the point here, so wait: true is deliberately absent -- it
+  # would health-check everything and make this list ignored.
+  timeout: 5m
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: weather-app
+      namespace: weather

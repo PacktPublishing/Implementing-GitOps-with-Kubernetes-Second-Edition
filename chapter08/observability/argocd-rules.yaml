@@ -1,0 +1,43 @@
+# `cloud` is an external label added at collection time (see README.md).
+# On the EKS capability for Argo CD there is no controller pod to scrape;
+# expose Application status through kube-state-metrics custom resource state
+# and map these expressions onto that output.
+groups:
+  - name: argocd-reconciliation
+    interval: 1m
+    rules:
+      # OutOfSync is the Argo CD equivalent of a failing Flux Kustomization.
+      # With selfHeal enabled it should be transient; a sustained OutOfSync means
+      # reconciliation is blocked.
+      - alert: ArgoCDApplicationOutOfSync
+        expr: |
+          max by (name, dest_server, cloud) (
+            argocd_app_info{sync_status!="Synced"}
+          ) == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Argo CD application {{ $labels.name }} out of sync"
+          description: "Cluster {{ $labels.dest_server }} on {{ $labels.cloud }} does not match Git."
+
+      - alert: ArgoCDApplicationDegraded
+        expr: |
+          max by (name, dest_server, cloud) (
+            argocd_app_info{health_status="Degraded"}
+          ) == 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Argo CD application {{ $labels.name }} degraded"
+
+      - alert: ArgoCDSyncFailures
+        expr: |
+          sum by (name, cloud) (
+            increase(argocd_app_sync_total{phase=~"Error|Failed"}[30m])
+          ) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "Repeated sync failures for {{ $labels.name }}"

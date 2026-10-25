@@ -1,0 +1,48 @@
+# Kept for readers who already run Azure DevOps and cannot move to GitHub Actions
+# yet. Compare it with .github/workflows/ch08-build-azure.yml. The deploy stage that
+# the first edition used, KubernetesManifest@0 with action: deploy plus a
+# createSecret task for imagePullSecret, is gone. The pipeline stops at the
+# registry. Removing that stage is the migration from push CD to GitOps CD.
+
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include: [chapter08/src]
+
+resources:
+  - repo: self
+
+variables:
+  # Workload-identity-federation service connection. The first edition used a
+  # secret-based connection; federated connections hold no credential.
+  azureServiceConnection: 'gitops-ch08-wif'
+  containerRegistryName: 'gitopsch08XXXXXX'
+  imageRepository: 'weather-app'
+  tag: '2.0.$(Build.BuildId)'
+  vmImageName: 'ubuntu-latest'
+
+stages:
+  - stage: Build
+    displayName: Build and publish image
+    jobs:
+      - job: Build
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          # Build on the agent and push, so the federated identity needs only
+          # AcrPush. `az acr build` would additionally require the Container
+          # Registry Tasks Contributor role.
+          - task: AzureCLI@2
+            displayName: Build and push to ACR
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr login --name "$(containerRegistryName)"
+                IMAGE="$(containerRegistryName).azurecr.io/$(imageRepository):$(tag)"
+                docker build -t "$IMAGE" -f chapter08/src/Dockerfile chapter08/src
+                docker push "$IMAGE"
+
+  # There is deliberately no Deploy stage. The cluster pulls.
