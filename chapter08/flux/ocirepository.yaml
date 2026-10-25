@@ -1,0 +1,22 @@
+# Git is the source of intent; the OCI artifact is an immutable, signed snapshot
+# of the desired state. Chapter 1 contrasts the two models and Chapter 4 covers
+# the mechanics; this file shows the multi-cloud benefit: the same artifact can be
+# replicated to ACR and ECR, so both clusters reconcile byte-identical state.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: gitops-ch08-oci
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://gitopsch08XXXXXX.azurecr.io/manifests/weather-app
+  ref:
+    semver: ">=2.0.0"
+  # No secretRef: the kubelet identity holds AcrPull, so ACR is reached without
+  # a registry credential in the cluster.
+  provider: azure
+  verify:
+    provider: cosign
+    matchOIDCIdentity:
+      - issuer: https://token.actions.githubusercontent.com
+        subject: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd/.github/workflows/ch08-build-azure.yml@refs/heads/main

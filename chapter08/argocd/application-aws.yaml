@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: weather-app-aws
+  namespace: argocd
+spec:
+  project: gitops-ch08
+  source:
+    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+    targetRevision: main
+    path: chapter08/gitops/overlays/aws
+  destination:
+    # The capability addresses EKS clusters by their registered name, which maps
+    # to a cluster ARN. An API server URL will not resolve.
+    name: eks-gitops-ch08
+    namespace: weather-app
+  syncPolicy:
+    automated:
+      prune: true
+      # selfHeal is what turns "detected drift" into "corrected drift". Without
+      # it, a kubectl edit on the cluster survives indefinitely.
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+  revisionHistoryLimit: 5

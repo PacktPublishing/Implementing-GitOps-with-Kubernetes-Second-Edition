@@ -1,0 +1,27 @@
+# The namespaces listed in runner.serviceAccount.allowedNamespaces.
+#
+# They have to exist before the Tofu Controller chart is installed. The chart
+# renders a tf-runner ServiceAccount (and its token Secret) into every
+# namespace on that list, and Helm fails the whole install if one of them is
+# missing. kustomize applies Namespace objects before anything else in a build,
+# and the tofu-controller Kustomization uses wait: true, so listing them here
+# is enough to get the ordering right.
+#
+# Every object in this chapter still lives in flux-system. These three are
+# where a multi-team estate would split the runners out; see "Tenancy and
+# scale" in the chapter.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra-dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra-staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra-prod

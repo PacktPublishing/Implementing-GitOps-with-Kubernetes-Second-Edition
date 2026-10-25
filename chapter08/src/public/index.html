@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>weather-app, a multi-cloud GitOps sample</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+    #meta { font-size: .85rem; opacity: .7; margin-bottom: 1.5rem; }
+    table { border-collapse: collapse; font-size: .9rem; }
+    th, td { border: 1px solid #8884; padding: .35rem .75rem; text-align: left; }
+    .bar { display: inline-block; height: .75rem; background: #4a7ebb; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <h1>My city weather</h1>
+  <div id="meta">loading&hellip;</div>
+  <table id="chart"><thead><tr><th>Date</th><th>&deg;C</th><th>Chart</th></tr></thead><tbody></tbody></table>
+
+  <script>
+    async function render() {
+      const info = await fetch('/api/info').then(r => r.json()).catch(() => ({}));
+      document.getElementById('meta').textContent =
+        `served from: ${info.cloud ?? 'unknown'} (revision ${info.revision ?? 'dev'})`;
+
+      const csv = await fetch('data.csv').then(r => r.text());
+      const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
+      const max = Math.max(...rows.map(r => parseFloat(r[1])));
+      const tbody = document.querySelector('#chart tbody');
+      for (const [date, temp] of rows) {
+        const tr = document.createElement('tr');
+        const width = Math.round((parseFloat(temp) / max) * 200);
+        tr.innerHTML = `<td>${date}</td><td>${temp}</td>` +
+                       `<td><span class="bar" style="width:${width}px"></span></td>`;
+        tbody.appendChild(tr);
+      }
+    }
+    render();
+  </script>
+</body>
+</html>

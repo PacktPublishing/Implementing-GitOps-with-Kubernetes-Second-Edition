@@ -1,0 +1,188 @@
+# The controller applies whatever reaches the default branch. That makes the
+# pull request the only place a policy gate can still stop a change, and makes
+# branch protection a security control rather than a convention.
+#
+# NOTE ON LOCATION. GitHub only reads workflows from `.github/workflows/` at the
+# repository root, so this file does not run where it sits. It lives here so it
+# travels with the chapter; copy it to the root `.github/workflows/` of your own
+# fork to make it real.
+#
+# SETUP. Apply chapter09/identity with -var github_repository=<owner>/<repo>,
+# then create three repository *variables* (Settings > Secrets and variables >
+# Actions > Variables), not secrets -- they are identifiers:
+#   AZURE_CLIENT_ID        tofu -chdir=chapter09/identity output -raw ci_client_id
+#   AZURE_TENANT_ID        tofu -chdir=chapter09/identity output -raw tenant_id
+#   AZURE_SUBSCRIPTION_ID  tofu -chdir=chapter09/identity output -raw subscription_id
+name: ch09-iac-policy
+
+on:
+  pull_request:
+    paths:
+      - "chapter09/iac/**"
+      - "chapter09/policy/**"
+
+permissions:
+  contents: read
+  id-token: write # federated login to Azure; no stored credentials
+  pull-requests: write
+
+env:
+  TOFU_VERSION: "1.12.6"
+  CONFTEST_VERSION: "0.68.2"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Source checks. No cloud access, so they also run on pull requests from
+  # forks.
+  # ---------------------------------------------------------------------------
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      # Every root and every module. Run `tofu fmt -recursive chapter09/iac`
+      # locally before pushing.
+      - name: Format check
+        run: tofu fmt -check -recursive chapter09/iac
+
+      - name: Validate every root
+        run: |
+          set -euo pipefail
+          for root in chapter09/iac/azure/*/network \
+                      chapter09/iac/azure/*/data \
+                      chapter09/iac/aws/dev; do
+            echo "::group::validate $root"
+            tofu -chdir="$root" init -backend=false -input=false
+            tofu -chdir="$root" validate
+            echo "::endgroup::"
+          done
+
+      # Paths and checks come from the config file, so a contributor running
+      # checkov locally from chapter09/ gets the same result.
+      - name: Static analysis (Checkov)
+        working-directory: chapter09
+        run: |
+          pip install checkov
+          checkov --config-file policy/.checkov.yaml
+
+  # ---------------------------------------------------------------------------
+  # Plans and plan policy. Needs Azure, so it is skipped for pull requests from
+  # forks, which receive no OIDC token.
+  # ---------------------------------------------------------------------------
+  plan:
+    needs: static
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      - name: Install Conftest
+        run: |
+          set -euo pipefail
+          curl -sSL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            | tar xz conftest
+          sudo install -m 0755 conftest /usr/local/bin/conftest
+
+      - name: Azure login (federated)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Development keeps its state in a cluster Secret that CI cannot reach,
+      # so its plan is made against an empty local state. Every resource shows
+      # as a create, which is enough for the rules about what a storage account
+      # looks like, and useless for the rule about deletions.
+      - name: Plan dev (configuration rules)
+        run: |
+          set -euo pipefail
+          POLICY=chapter09/policy/conftest
+
+          root=chapter09/iac/azure/dev/network
+          tofu -chdir="$root" init -input=false
+          tofu -chdir="$root" plan -input=false -lock=false -out tfplan
+          tofu -chdir="$root" show -json tfplan > "$root/plan.json"
+          conftest test --policy "$POLICY" "$root/plan.json"
+
+          # The data root's inputs arrive from the network outputs Secret at
+          # reconcile time. Placeholders are fine here: the policy asks what the
+          # storage account looks like, not which subnet it lands in.
+          SUB="00000000-0000-0000-0000-000000000000"
+          VNET="/subscriptions/$SUB/resourceGroups/gitops-dev-rg/providers/Microsoft.Network/virtualNetworks/gitops-dev-vnet"
+          root=chapter09/iac/azure/dev/data
+          tofu -chdir="$root" init -input=false
+          tofu -chdir="$root" plan -input=false -lock=false -out tfplan \
+            -var "resource_group_name=gitops-dev-rg" \
+            -var "location=switzerlandnorth" \
+            -var "vnet_id=$VNET" \
+            -var "private_endpoint_subnet_id=$VNET/subnets/private-endpoints"
+          tofu -chdir="$root" show -json tfplan > "$root/plan.json"
+          conftest test --policy "$POLICY" "$root/plan.json"
+
+      # Staging and production are planned against their real remote state,
+      # which is the only way a plan can show that a change destroys something.
+      #
+      #   -lock=false     CI only reads. It must never hold the lease the
+      #                   controller needs to apply.
+      #   -refresh=false  Compare the code with the recorded state and do not
+      #                   call Azure for every resource. The CI identity then
+      #                   needs Storage Blob Data Reader on the state account
+      #                   and nothing else. Drift is the controller's job.
+      #   --fail-on-warn  The "will be destroyed" rule is a warn. Without this
+      #                   flag Conftest reports it and exits 0, which is not a
+      #                   gate. A deliberate deletion now needs someone with
+      #                   the right to merge past a failed check.
+      - name: Plan staging and prod against real state
+        run: |
+          set -euo pipefail
+          POLICY=chapter09/policy/conftest
+
+          plan_root() {
+            local env="$1" part="$2"; shift 2
+            local root="chapter09/iac/azure/$env/$part"
+            echo "::group::plan $env/$part"
+            tofu -chdir="$root" init -input=false -reconfigure \
+              -backend-config=../backend.hcl \
+              -backend-config="key=$env/$part.tfstate"
+            tofu -chdir="$root" plan -input=false -lock=false -refresh=false \
+              -out tfplan "$@"
+            tofu -chdir="$root" show -json tfplan > "$root/plan.json"
+            echo "::endgroup::"
+            conftest test --fail-on-warn --policy "$POLICY" "$root/plan.json"
+          }
+
+          for env in staging prod; do
+            plan_root "$env" network
+
+            # The data root is fed by the network root's outputs. Read them
+            # from the network state -- the same values the controller copies
+            # into the outputs Secret -- so the data plan uses real inputs and
+            # does not propose replacements that would never happen.
+            net="chapter09/iac/azure/$env/network"
+            outputs=$(tofu -chdir="$net" output -json)
+            if [ "$(echo "$outputs" | jq 'length')" -eq 0 ]; then
+              echo "::notice::$env/network has no state yet; skipping $env/data"
+              continue
+            fi
+            args=()
+            for k in resource_group_name location vnet_id private_endpoint_subnet_id; do
+              args+=(-var "$k=$(echo "$outputs" | jq -r ".$k.value")")
+            done
+            plan_root "$env" data "${args[@]}"
+          done

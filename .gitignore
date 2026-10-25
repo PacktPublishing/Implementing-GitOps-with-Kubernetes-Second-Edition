@@ -12,3 +12,14 @@ docker-compose.yml
 
 # macOS
 .DS_Store
+
+# Terraform / OpenTofu local state, plans and working directories
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/azureplan
+**/awsplan
+**/tfplan
+**/plan.json
+**/terraform.tfvars

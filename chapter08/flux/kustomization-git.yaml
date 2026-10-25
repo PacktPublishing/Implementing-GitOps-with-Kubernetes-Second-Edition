@@ -1,0 +1,21 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: weather-app-azure
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 1m
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: gitops-ch08
+  path: ./chapter08/gitops/overlays/azure
+  prune: true
+  wait: true
+  # Report a clear failure instead of a partial apply when the overlay is invalid.
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: weather-app
+      namespace: weather-app

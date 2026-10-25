@@ -1,0 +1,40 @@
+# Drift Detection model.
+#
+# For infrastructure that predates GitOps and is still changed by hand. On
+# every interval the controller runs a plan with refresh to compare the real
+# resources with the code, reports a Drift condition and emits an event -- but
+# it never stores that plan for approval and never applies. It is the least
+# intrusive way to bring an existing estate under observation before bringing
+# it under control.
+#
+# Do not confuse approvePlan: disable with spec.disableDriftDetection, which
+# switches drift detection off. With both set the object does nothing at all.
+#
+# BEFORE APPLYING: set spec.path to a configuration that describes
+# infrastructure you already own. The book repository deliberately ships no
+# such configuration -- the point of this model is that the estate came first.
+# Because it needs a path only you can supply, this object is applied by hand
+# rather than reconciled from chapter09/terraform.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: legacy-estate-drift
+  namespace: flux-system
+spec:
+  interval: 30m
+  approvePlan: disable
+  path: ./chapter09/iac/azure/legacy # <-- replace with your own configuration
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  runnerPodTemplate:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token

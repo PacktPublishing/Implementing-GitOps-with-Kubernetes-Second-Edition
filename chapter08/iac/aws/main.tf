@@ -1,118 +1,100 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~>5"
-    }
+# -----------------------------------------------------------------------------
+# Networking
+# -----------------------------------------------------------------------------
+
+data "aws_availability_zones" "available" {
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
   }
 }
-
-provider "aws" {
-  region = "eu-central-1"
-
-}
-
-
-# ECR creation
-resource "aws_ecr_repository" "ecr" {
-  name                 = "weather-app"
-  image_tag_mutability = "MUTABLE"
-}
-
-# VPC and subnets
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "5.7.0"
+  version = "~> 6.0"
 
-  name = "eks-cluster-vpc"
+  name = "${var.cluster_name}-vpc"
   cidr = "10.0.0.0/16"
 
-  # At least two AZs in the region are required for EKS.
-  azs             = ["eu-central-1a", "eu-central-1b"]
+  # EKS requires subnets in at least two availability zones.
+  azs             = slice(data.aws_availability_zones.available.names, 0, 2)
   private_subnets = ["10.0.0.0/19", "10.0.32.0/19"]
   public_subnets  = ["10.0.64.0/19", "10.0.96.0/19"]
 
-  enable_nat_gateway     = true
-  single_nat_gateway     = true
-
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
   enable_dns_hostnames = true
 
+  # Subnet discovery tags for the AWS Load Balancer Controller.
+  public_subnet_tags  = { "kubernetes.io/role/elb" = 1 }
+  private_subnet_tags = { "kubernetes.io/role/internal-elb" = 1 }
 
-  public_subnet_tags = {
-    "kubernetes.io/cluster/eksgitopscluster" = "shared"
-    "kubernetes.io/role/elb"                      = 1
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/cluster/eksgitopscluster" = "shared"
-    "kubernetes.io/role/internal-elb"             = 1
-  }
+  tags = var.tags
 }
+
+# -----------------------------------------------------------------------------
+# Container registry
+# -----------------------------------------------------------------------------
+
+resource "aws_ecr_repository" "app" {
+  name = "weather-app"
+
+  # IMMUTABLE is the GitOps-correct choice: a tag always refers to the same image,
+  # so what Git records is what runs. The first edition used MUTABLE with :latest.
+  image_tag_mutability = "IMMUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = var.tags
+}
+
+# -----------------------------------------------------------------------------
+# EKS cluster
+#
+# api_and_config_map is avoided: access is granted purely through EKS access
+# entries, which is also what the Argo CD capability uses to reach the cluster.
+# -----------------------------------------------------------------------------
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.8.4"
+  version = "~> 21.0"
 
-  cluster_name    = "eksgitopscluster"
-  cluster_version = "1.29"
+  name               = var.cluster_name
+  kubernetes_version = var.kubernetes_version
 
-  cluster_endpoint_public_access  = true
+  endpoint_public_access = true
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
-  eks_managed_node_group_defaults = {    
-    instance_types = ["t3.small"]
+  authentication_mode                      = "API"
+  enable_cluster_creator_admin_permissions = true
+
+  # Pod Identity is the successor to IRSA: an agent on the node brokers
+  # credentials, so no OIDC trust policy per role and no service-account
+  # annotation plumbing. See identity.tf.
+  addons = {
+    coredns                = {}
+    kube-proxy             = {}
+    vpc-cni                = { before_compute = true }
+    eks-pod-identity-agent = { before_compute = true }
+    aws-ebs-csi-driver     = {}
   }
 
   eks_managed_node_groups = {
-    one = {
-      name = "node-group-1"
-
-      instance_types = ["t3.small"]
-
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
+    default = {
+      instance_types = var.instance_types
+      min_size       = 2
+      max_size       = 4
+      desired_size   = 2
     }
   }
 
-  create_node_security_group = true
-}
-
-
-# IAM role to allow EKS nodes to pull images from ECR
-resource "aws_iam_policy" "ecr_pull" {
-  name        = "ecr-pull-policy"
-  path        = "/"
-  description = "IAM policy for EKS to pull images from ECR"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action   = "ecr:GetAuthorizationToken",
-        Effect   = "Allow",
-        Resource = "*"
-      },
-      {
-        Action = [
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:GetRepositoryPolicy",
-          "ecr:DescribeRepositories",
-          "ecr:ListImages",
-          "ecr:DescribeImages",
-          "ecr:BatchGetImage",
-        ],
-        Effect   = "Allow",
-        Resource = aws_ecr_repository.ecr.arn
-      },
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecr_pull_attach" {
-  role       = module.eks.cluster_iam_role_name
-  policy_arn = aws_iam_policy.ecr_pull.arn
+  tags = var.tags
 }

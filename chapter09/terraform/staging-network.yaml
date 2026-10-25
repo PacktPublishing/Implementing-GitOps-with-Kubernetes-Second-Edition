@@ -1,0 +1,75 @@
+# Environment: staging. Mode: GitOps Automation, with remote state.
+#
+# The middle posture. Like dev it plans and applies without a human, and it is
+# destroyed with its custom resource. Like prod its state lives in the remote
+# backend, so it survives the cluster and CI can plan against it -- which is
+# what lets the Conftest "will be destroyed" rule see real deletions before a
+# change reaches production.
+#
+# It reads from flux-system (main), not from the pinned infra-modules source:
+# staging is where a change to the HCL lands first, before the tag that
+# production follows is advanced.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: staging-network
+  namespace: flux-system
+spec:
+  interval: 10m
+  approvePlan: auto
+  path: ./chapter09/iac/azure/staging/network
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+
+  backendConfig:
+    customConfiguration: |
+      backend "azurerm" {
+        resource_group_name  = "gitops-tfstate-rg"
+        storage_account_name = "<tfstate-storage-account>"
+        container_name       = "tfstate"
+        key                  = "staging/network.tfstate"
+        use_oidc             = true
+        use_azuread_auth     = true
+      }
+
+  tfstate:
+    forceUnlock: "no"
+
+  writeOutputsToSecret:
+    name: staging-network-outputs
+    outputs:
+      - resource_group_name
+      - location
+      - vnet_id
+      - private_endpoint_subnet_id
+
+  destroyResourcesOnDeletion: true
+
+  runnerPodTemplate:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      env:
+        - name: ARM_USE_OIDC
+          value: "true"
+        - name: ARM_OIDC_TOKEN_FILE_PATH
+          value: /var/run/secrets/azure/tokens/azure-identity-token
+        - name: ARM_SUBSCRIPTION_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: subscription_id
+        - name: ARM_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: tenant_id
+        - name: ARM_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: azure-environment
+              key: client_id

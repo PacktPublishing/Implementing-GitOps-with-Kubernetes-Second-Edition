@@ -1,0 +1,40 @@
+# One Kustomization owns every Terraform custom resource, so that the
+# infrastructure layer has a single readiness signal the application layer can
+# depend on.
+#
+# Note what is NOT set here. wait: true would health-check every resource this
+# Kustomization applied, and the Flux specification is explicit that it makes
+# the healthChecks list below ignored. Named health checks are what we want:
+# readiness should mean "the modules the application needs have applied", not
+# "every object in the directory is happy". prod-network and prod-data
+# deliberately hold at plan until a human approves them, and holding the
+# application release hostage to a production approval is not the coupling we
+# are describing. staging-* are left out for the same reason: the application
+# in this chapter consumes dev-data-outputs only.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m
+  prune: true
+  path: ./chapter09/terraform
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  # The CRD has to exist before these objects can be applied.
+  dependsOn:
+    - name: tofu-controller
+
+  timeout: 30m
+  healthChecks:
+    - apiVersion: infra.contrib.fluxcd.io/v1alpha2
+      kind: Terraform
+      name: dev-network
+      namespace: flux-system
+    - apiVersion: infra.contrib.fluxcd.io/v1alpha2
+      kind: Terraform
+      name: dev-data
+      namespace: flux-system

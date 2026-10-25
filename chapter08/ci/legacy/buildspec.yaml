@@ -1,0 +1,28 @@
+# CodeBuild equivalent, for readers with an existing CodePipeline investment.
+# As with the Azure pipeline, the kubectl/EKS deployment steps that the first
+# edition included have been removed: CodeBuild builds and pushes, Argo CD deploys.
+
+version: 0.2
+
+env:
+  variables:
+    IMAGE_NAME: weather-app
+  exported-variables:
+    - IMAGE_TAG
+
+phases:
+  pre_build:
+    commands:
+      - IMAGE_TAG="2.0.${CODEBUILD_BUILD_NUMBER}"
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+  build:
+    commands:
+      - docker build -t "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" -f chapter08/src/Dockerfile chapter08/src
+
+  post_build:
+    commands:
+      - docker push "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+      - echo "Image published. Argo CD reconciles the cluster; this build does not."

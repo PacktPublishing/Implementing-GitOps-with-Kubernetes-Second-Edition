@@ -1,0 +1,11 @@
+# What the management cluster reconciles. The FluxInstance syncs this path, so
+# anything not listed here is never applied -- which is why the Tofu Controller
+# HelmRelease has to appear explicitly.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - tofu-controller.yaml
+  - infrastructure.yaml
+  - ../../notifications/alerts.yaml
+  - ../../gitops/app-kustomization.yaml
