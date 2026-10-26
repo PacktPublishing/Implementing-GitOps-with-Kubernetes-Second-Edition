@@ -7,8 +7,10 @@
 # control plane outside the cluster and handles scaling, upgrades, high
 # availability, SSO and ECR token refresh.
 #
-# The capability must be created in the region where AWS IAM Identity Center is
-# configured, because Identity Center is the only supported SSO provider.
+# Identity Center is the only supported SSO provider, so its instance is a
+# prerequisite. The configuration references the instance by ARN and exposes
+# its region (idc_region) separately from the cluster's; keep the two aligned
+# unless you have a specific reason not to.
 # -----------------------------------------------------------------------------
 
 data "aws_ssoadmin_instances" "this" {}
@@ -39,12 +41,17 @@ module "argocd_capability" {
         idc_instance_arn = one(data.aws_ssoadmin_instances.this.arns)
       }
 
-      # Every Application, ApplicationSet and AppProject must live in this one
-      # namespace. Self-managed Argo CD allows several; the capability does not.
+      # The capability's primary namespace. AppProjects must live here.
+      # Applications and ApplicationSets use it by default, but additional
+      # namespaces can be enabled (application.namespaces and
+      # applicationsetcontroller.namespaces in argocd-cmd-params-cm, permitted
+      # by the AppProject's spec.sourceNamespaces).
       namespace = var.argocd_namespace
 
-      # Only three roles exist: ADMIN, EDITOR, VIEWER. Custom RBAC policy strings
-      # and third-party SSO providers are not supported.
+      # Global role mapping accepts three roles only: ADMIN, EDITOR, VIEWER.
+      # Finer-grained access comes from AppProject roles and policies; EDITOR
+      # and VIEWER users need project roles to see Applications. Third-party
+      # SSO providers are not supported.
       rbac_role_mapping = [{
         role = "ADMIN"
         identity = [{

@@ -38,10 +38,11 @@ spec:
         azure.workload.identity/use: "true"
     spec:
       env:
-        - name: ARM_USE_OIDC
+        # AKS workload identity: the webhook injects AZURE_CLIENT_ID,
+        # AZURE_TENANT_ID and AZURE_FEDERATED_TOKEN_FILE from the annotated
+        # service account, so no token path is hard-coded here.
+        - name: ARM_USE_AKS_WORKLOAD_IDENTITY
           value: "true"
-        - name: ARM_OIDC_TOKEN_FILE_PATH
-          value: /var/run/secrets/azure/tokens/azure-identity-token
         - name: ARM_SUBSCRIPTION_ID
           valueFrom:
             configMapKeyRef:

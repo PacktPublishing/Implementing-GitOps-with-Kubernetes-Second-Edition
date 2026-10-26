@@ -9,10 +9,10 @@ terraform {
   }
 }
 
-# No static credentials anywhere in this block. The runner pod receives a
-# federated token from the AKS OIDC issuer and exchanges it for an Entra
-# token; ARM_USE_OIDC and ARM_OIDC_TOKEN_FILE_PATH are set on the runner pod
-# by the Terraform custom resource.
+# No static credentials anywhere in this block. In the runner pod the
+# Terraform custom resource sets ARM_USE_AKS_WORKLOAD_IDENTITY, and the AKS
+# webhook injects the client ID, tenant ID and federated token file from the
+# annotated service account. In CI, ARM_USE_OIDC uses the GitHub OIDC token.
 provider "azurerm" {
   use_oidc = true
 

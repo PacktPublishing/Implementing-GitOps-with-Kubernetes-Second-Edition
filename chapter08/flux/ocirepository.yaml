@@ -19,4 +19,4 @@ spec:
     provider: cosign
     matchOIDCIdentity:
       - issuer: https://token.actions.githubusercontent.com
-        subject: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd/.github/workflows/ch08-build-azure.yml@refs/heads/main
+        subject: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition/.github/workflows/ch08-build-azure.yml@refs/heads/main

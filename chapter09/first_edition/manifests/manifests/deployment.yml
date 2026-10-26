@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: myweatherappv1 
-          image: aksgitops3003204acr.azurecr.io/myweatherappv1
+          image: yourregistryname.azurecr.io/myweatherappv1
           ports:
           - containerPort: 8080

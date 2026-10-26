@@ -6,7 +6,7 @@ metadata:
 spec:
   project: gitops-ch08
   source:
-    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
     targetRevision: main
     path: chapter08/gitops/overlays/aws
   destination:

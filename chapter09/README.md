@@ -79,7 +79,12 @@ chapter09/
 > cp chapter09/ci/.github/workflows/ch09-iac-policy.yml .github/workflows/
 > ```
 >
-> Then create the three repository variables listed at the top of the workflow file.
+> Then create the three repository variables listed at the top of the workflow file,
+> and a GitHub environment named `iac-plan` with required reviewers. The `static`
+> job (format, validate, Checkov) runs on every pull request with no cloud access.
+> The `plan` job, which reads real staging and production state, runs in `iac-plan`
+> and waits for a reviewer; the CI identity's federated credential trusts only
+> `repo:<owner>/<repo>:environment:iac-plan`.
 
 ### What the cluster reconciles, and what it does not
 
@@ -266,7 +271,7 @@ instead of OpenTofu, or extra tooling in the runner:
 ```bash
 cd chapter09/runner
 export TF_CONTROLLER_VERSION=v0.16.5
-export TOFU_VERSION=1.12.6
+export TOFU_VERSION=1.12.9
 
 docker build \
   --build-arg BASE_IMAGE=ghcr.io/flux-iac/tf-runner:${TF_CONTROLLER_VERSION}-base \
@@ -476,7 +481,8 @@ Private endpoints in particular survive a partial teardown and keep billing.
 | `tofu: not found` in the runner log | `runner.image` points at a `-base` tag, which has no binary | Use the stock tag, or build from `runner/` and point at your own image |
 | Runner pods never appear in `infra-dev` | `allowedNamespaces` nested under `runner` instead of `runner.serviceAccount` | Helm ignores the misplaced key silently; fix the nesting and reconcile the HelmRelease |
 | `AADSTS70021: No matching federated identity record` | Namespace or service account name in the federation subject is wrong, **or** the management cluster (Chapter 8) was rebuilt since `identity/` was last applied, so its OIDC issuer URL no longer matches | Subject must be `system:serviceaccount:<ns>:tf-runner`; if the cluster was rebuilt, re-apply `identity/` with the current `TF_VAR_oidc_issuer_url` — see the Prerequisites callout |
-| GitHub Actions `AADSTS700213` on the pull request gate | the fork has immutable OIDC subject claims enabled, so GitHub's subject prefix is `repo:owner@ownerId/repo@repoId`, not `repo:owner/repo` | check `gh api /repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix` and set `TF_VAR_github_oidc_subject_prefix` before re-applying `identity/` |
+| GitHub Actions `AADSTS700213` on the pull request gate | the `plan` job is not running in the `iac-plan` environment (the credential trusts `…:environment:iac-plan` only), **or** the fork has immutable OIDC subject claims enabled, so GitHub's subject prefix is `repo:owner@ownerId/repo@repoId`, not `repo:owner/repo` | keep `environment: iac-plan` on the job and match `TF_VAR_ci_environment`; check `gh api /repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix` and set `TF_VAR_github_oidc_subject_prefix` before re-applying `identity/` |
+| `plan` job waits forever | the `iac-plan` environment requires a reviewer | approve the deployment in the pull request's checks view; that approval is the gate |
 | Authentication fails with an empty client id | `azure-environment` ConfigMap built from unset variables | Re-run the exports at the end of step 1, then recreate the ConfigMap |
 | `dev-data` stuck in `Unknown` | `dev-network` has not written its outputs Secret yet | `kubectl -n flux-system describe tf/dev-network` |
 | Variables from the outputs Secret are empty | Output names and variable names differ | Match them, or map with `varsFrom[].varsKeys` |
@@ -497,7 +503,7 @@ Private endpoints in particular survive a partial teardown and keep billing.
 
 | Component | Version | Checked |
 |---|---|---|
-| OpenTofu | 1.12.6 | September 2026 |
+| OpenTofu | 1.12.9 | October 2026 |
 | Terraform | 1.16.x (BUSL 1.1) | September 2026 |
 | Flux | 2.7.x (see `flux/flux-instance.yaml`) | September 2026 |
 | Flux CLI | 2.9 or later (plugin system) | September 2026 |

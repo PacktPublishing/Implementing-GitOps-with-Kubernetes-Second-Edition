@@ -28,7 +28,7 @@ spec:
     spec:
       project: gitops-ch08
       source:
-        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
         targetRevision: main
         # The label value selects the overlay, so provider differences stay in
         # the repository layout instead of leaking into the control plane.

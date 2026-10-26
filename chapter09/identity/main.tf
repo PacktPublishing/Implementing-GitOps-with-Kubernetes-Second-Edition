@@ -15,9 +15,11 @@ resource "azurerm_user_assigned_identity" "tf_runner" {
   location            = azurerm_resource_group.bootstrap.location
 }
 
-# azurerm 5.0 replaced the old parent_id and resource_group_name arguments with
-# a single user_assigned_identity_id; the resource group is implied by the
-# identity's resource ID. Examples written against 4.x will not plan here.
+# AzureRM 4.65 renamed parent_id to user_assigned_identity_id, and AzureRM 5.0
+# removed parent_id; the resource group is implied by the identity's resource
+# ID. When upgrading an existing credential, review the plan rather than
+# assuming the rename forces replacement; if a replacement is proposed,
+# schedule it so runner token exchanges are not interrupted.
 resource "azurerm_federated_identity_credential" "tf_runner" {
   for_each = toset(var.runner_namespaces)
 

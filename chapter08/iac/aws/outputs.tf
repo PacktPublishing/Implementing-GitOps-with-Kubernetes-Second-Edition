@@ -22,6 +22,11 @@ output "github_ci_role_arn" {
   value       = aws_iam_role.github_ci.arn
 }
 
+output "github_ci_pr_role_arn" {
+  description = "Separate pull-request role (no ECR push). Use only in pull-request workflows."
+  value       = aws_iam_role.github_ci_pr.arn
+}
+
 output "argocd_capability_arn" {
   value = module.argocd_capability.arn
 }

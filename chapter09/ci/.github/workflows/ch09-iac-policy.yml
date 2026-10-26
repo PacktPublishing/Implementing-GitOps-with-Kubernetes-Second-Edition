@@ -13,6 +13,14 @@
 #   AZURE_CLIENT_ID        tofu -chdir=chapter09/identity output -raw ci_client_id
 #   AZURE_TENANT_ID        tofu -chdir=chapter09/identity output -raw tenant_id
 #   AZURE_SUBSCRIPTION_ID  tofu -chdir=chapter09/identity output -raw subscription_id
+#
+# GATE. Create a GitHub environment named `iac-plan` (Settings > Environments)
+# with required reviewers and, ideally, "Prevent self-review". The plan job
+# below runs in that environment, so it reads real staging and production
+# state only after an approved reviewer releases it. The CI identity's
+# federated credential trusts repo:<owner>/<repo>:environment:iac-plan and
+# nothing else, so the static job, which runs on every pull request, cannot
+# obtain an Azure token at all.
 name: ch09-iac-policy
 
 on:
@@ -21,19 +29,19 @@ on:
       - "chapter09/iac/**"
       - "chapter09/policy/**"
 
+# Least privilege by default. Only the gated plan job may request an OIDC token.
 permissions:
   contents: read
-  id-token: write # federated login to Azure; no stored credentials
-  pull-requests: write
 
 env:
-  TOFU_VERSION: "1.12.6"
+  TOFU_VERSION: "1.12.9"
   CONFTEST_VERSION: "0.68.2"
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Source checks. No cloud access, so they also run on pull requests from
-  # forks.
+  # Source checks. Offline formatting, validation and static analysis only: no
+  # cloud access and no OIDC token, so they are safe on any pull request,
+  # including pull requests from forks.
   # ---------------------------------------------------------------------------
   static:
     runs-on: ubuntu-latest
@@ -71,13 +79,22 @@ jobs:
           checkov --config-file policy/.checkov.yaml
 
   # ---------------------------------------------------------------------------
-  # Plans and plan policy. Needs Azure, so it is skipped for pull requests from
-  # forks, which receive no OIDC token.
+  # Plans and plan policy against real state. Needs Azure, so it is:
+  #   * skipped for pull requests from forks, which receive no OIDC token, and
+  #   * gated by the protected `iac-plan` environment: it waits for a required
+  #     reviewer before it can request a token. Even a read-only plan executes
+  #     provider and data source code and reads production state, so it must
+  #     not run on unreviewed code without a human releasing it.
   # ---------------------------------------------------------------------------
   plan:
     needs: static
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    environment: iac-plan
+    permissions:
+      contents: read
+      id-token: write # federated login to Azure; no stored credentials
+      pull-requests: write
     env:
       ARM_USE_OIDC: "true"
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}

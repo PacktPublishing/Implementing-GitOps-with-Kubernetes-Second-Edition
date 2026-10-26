@@ -67,17 +67,55 @@ data "aws_iam_policy_document" "github_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Scope the trust to specific refs. A wildcard on the whole repository would
-    # let any branch mint registry credentials.
+    # Scope the trust to the trusted publishing branch. A wildcard on the whole
+    # repository (repo:owner/repo:*) would let any ref mint registry credentials.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
         "repo:${var.github_repository}:ref:refs/heads/${var.gitops_branch}",
-        "repo:${var.github_repository}:pull_request",
+        # Give pull-request validation a separate, least-privileged role.
       ]
     }
   }
+}
+
+# -----------------------------------------------------------------------------
+# Pull-request validation: a SEPARATE role with no ECR push rights
+#
+# The pull_request subject is deliberately absent from the publishing role
+# above. This role has no policy attached; grant it only what your
+# pull-request checks need, and never ecr:PutImage.
+# -----------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "github_pr_trust" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repository}:pull_request"]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_ci_pr" {
+  name               = "${var.cluster_name}-github-ci-pr"
+  assume_role_policy = data.aws_iam_policy_document.github_pr_trust.json
+  tags               = var.tags
 }
 
 resource "aws_iam_role" "github_ci" {

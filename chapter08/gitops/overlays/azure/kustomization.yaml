@@ -10,10 +10,12 @@ resources:
 # The $imagepolicy markers are what make Flux image automation work: the Setters
 # strategy rewrites only lines that carry one. Without the markers the
 # ImageUpdateAutomation in flux/ reconciles happily and never changes anything.
+# Edit these two lines by hand (or with sed), not with `kustomize edit set
+# image`: kustomize rewrites the file and drops comments, markers included.
 images:
 - name: weather-app
-  newName: gitopsch08XXXXXX.azurecr.io/weather-app
-  newTag: 2.0.3
+  newName: gitopsch08XXXXXX.azurecr.io/weather-app # {"$imagepolicy": "flux-system:weather-app:name"}
+  newTag: 2.0.3 # {"$imagepolicy": "flux-system:weather-app:tag"}
 
 patches:
 - path: deployment-patch.yaml

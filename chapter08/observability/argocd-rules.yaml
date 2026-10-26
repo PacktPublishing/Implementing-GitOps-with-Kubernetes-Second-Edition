@@ -1,7 +1,11 @@
+# Self-managed Argo CD only. argocd_app_info carries application sync and
+# health status; argocd_app_sync_total counts sync activity and failures.
+#
+# On the EKS capability for Argo CD these controller metrics are NOT
+# scrapeable, because the control plane runs outside your cluster. Use
+# argocd-capability-rules.yaml with kube-state-metrics-argocd.yaml instead.
+#
 # `cloud` is an external label added at collection time (see README.md).
-# On the EKS capability for Argo CD there is no controller pod to scrape;
-# expose Application status through kube-state-metrics custom resource state
-# and map these expressions onto that output.
 groups:
   - name: argocd-reconciliation
     interval: 1m

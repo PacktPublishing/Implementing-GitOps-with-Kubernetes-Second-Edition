@@ -1,41 +1,51 @@
+# Flux reconciliation signals.
+#
+# gotk_resource_info is NOT published by the Flux controllers. It is exported
+# by kube-state-metrics from the Flux custom resources' status, using the
+# custom-resource-state configuration in the Flux monitoring example (see
+# README.md). The older gotk_reconcile_condition and gotk_suspend_status
+# controller metrics were removed from Flux and must not be used.
+#
+# `cloud` is an external label added at collection time by the scraping agent,
+# not by Kustomize. See README.md. Until it is configured the label is empty.
 groups:
   - name: flux-reconciliation
     interval: 1m
     rules:
-      # NOTE: `cloud` is an external label added by the scraping agent, not by
-      # Kustomize. See README.md. Drop it if you have not configured one.
-      # A Kustomization that has not been ready for 15 minutes means the cluster
+      # A Flux object that has not been Ready for 15 minutes means the cluster
       # is no longer converging on Git. This is the signal that matters most.
       - alert: FluxReconciliationFailing
         expr: |
-          max by (namespace, name, kind, cloud) (
-            gotk_reconcile_condition{type="Ready", status="False"}
+          max by (exported_namespace, name, customresource_kind, cloud) (
+            gotk_resource_info{ready="False"}
           ) == 1
         for: 15m
         labels:
           severity: critical
         annotations:
-          summary: "Flux {{ $labels.kind }} {{ $labels.namespace }}/{{ $labels.name }} has not reconciled"
-          description: "Desired state in Git is not being applied on {{ $labels.cloud }}."
+          summary: "Flux {{ $labels.customresource_kind }} {{ $labels.name }} is not reconciling"
+          description: "Git state is not being applied on {{ $labels.cloud }}."
 
       # Suspended is a legitimate operational action, but a resource left
       # suspended is silent drift waiting to happen.
       - alert: FluxResourceSuspended
         expr: |
-          max by (namespace, name, kind, cloud) (gotk_suspend_status) == 1
+          max by (exported_namespace, name, customresource_kind, cloud) (
+            gotk_resource_info{suspended="true"}
+          ) == 1
         for: 2h
         labels:
           severity: warning
         annotations:
-          summary: "Flux {{ $labels.kind }} {{ $labels.namespace }}/{{ $labels.name }} suspended for over two hours"
+          summary: "Flux {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} suspended for over two hours"
 
       - alert: FluxSourceUnavailable
         expr: |
-          max by (namespace, name, cloud) (
-            gotk_reconcile_condition{kind=~"GitRepository|OCIRepository", type="Ready", status="False"}
+          max by (exported_namespace, name, customresource_kind, cloud) (
+            gotk_resource_info{customresource_kind=~"GitRepository|OCIRepository", ready="False"}
           ) == 1
         for: 10m
         labels:
           severity: critical
         annotations:
-          summary: "Flux cannot read its source {{ $labels.namespace }}/{{ $labels.name }}"
+          summary: "Flux cannot read its source {{ $labels.exported_namespace }}/{{ $labels.name }}"

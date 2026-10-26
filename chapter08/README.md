@@ -29,7 +29,7 @@ EKS. Nothing outside the cluster holds cluster credentials.
 | CI identity | service connection secret, access keys | GitHub OIDC federation, no stored secret |
 | Registry pull | `imagePullSecret` in the cluster | AKS kubelet identity (`AcrPull`) / EKS node role |
 | Workload identity | not used | Entra Workload ID / EKS Pod Identity |
-| Image reference | `:latest`, mutable tags | immutable tags, digest pinned in Git |
+| Image reference | `:latest`, mutable tags | immutable, versioned tags pinned in Git |
 | Manifests | two divergent copies (`manifests/`, `deployment/`) | one Kustomize base + per-cloud overlays |
 | Kubernetes | 1.29 (out of support) | 1.34 |
 | Providers | `azurerm ~> 3`, `aws ~> 5` | `azurerm ~> 4`, `aws ~> 6` |
@@ -289,9 +289,17 @@ show-tags --name "${ACR%%.*}" --repository weather-app -o table`), not the
 placeholder below — a tag that isn't in the registry produces a silent
 `ImagePullBackOff`, not a Terraform or Flux error.
 
+Edit the two image lines in place rather than with `kustomize edit set image`:
+kustomize rewrites the whole file and drops comments, including the
+`$imagepolicy` markers that Flux image automation depends on.
+
 ```bash
 cd ../../gitops/overlays/azure
-kustomize edit set image "weather-app=${ACR}/weather-app:2.0.1"
+sed -i.bak \
+  -e "s|gitopsch08[A-Za-z0-9]*\.azurecr\.io|${ACR}|" \
+  -e "s|newTag: [0-9.]*|newTag: 2.0.1|" \
+  kustomization.yaml && rm kustomization.yaml.bak
+grep imagepolicy kustomization.yaml     # both markers must still be there
 git add -A && git commit -m "chore(ch08): azure overlay image" && git push
 ```
 
@@ -333,7 +341,10 @@ aws iam create-open-id-connect-provider \
 aws sso-admin list-instances --query 'Instances[0].InstanceArn' --output text
 ```
 
-Note the region the Identity Center instance is in and use it for `region`.
+Note the region the Identity Center instance is in. The capability configuration
+exposes the Identity Center region separately from the cluster's; the simplest
+setup uses the same value for `region`, and you should keep the two aligned
+unless you have a specific reason not to.
 
 ### 2.2 Provision
 
@@ -396,9 +407,13 @@ Two capability-specific details matter and will bite you otherwise:
 - **Clusters are addressed by ARN, not by API server URL.** A manifest carrying
   `server: https://...eks.amazonaws.com` will not resolve. The local cluster is
   not auto-registered either, so register it by ARN like any other.
-- **All `Application`, `ApplicationSet` and `AppProject` objects must live in the
-  single namespace configured when the capability was created** (`argocd` here).
-  CLI commands need the namespace prefix:
+- **Namespaces are bounded.** `AppProject` objects must live in the capability's
+  primary namespace (`argocd` here). `Application` and `ApplicationSet` objects
+  use it by default; additional namespaces work only once they are enabled
+  (`application.namespaces` and `applicationsetcontroller.namespaces` in
+  `argocd-cmd-params-cm`) and permitted by the project's `spec.sourceNamespaces`.
+  Objects in unconfigured namespaces are not reconciled. CLI commands need the
+  namespace prefix:
 
 ```bash
 argocd app get argocd/weather-app-aws
@@ -453,7 +468,12 @@ cluster and adding an overlay directory; the ApplicationSet does not change.
 # Both overlays render, and the base contains no provider-specific values
 kustomize build gitops/overlays/azure | grep -E 'image:|cloud:'
 kustomize build gitops/overlays/aws   | grep -E 'image:|cloud:'
-grep -rniE 'azurerm|\.amazonaws\.com|azurecr\.io' gitops/base/ && echo "LEAK" || echo "base is portable"
+grep -rniE 'azurecr\.io|amazonaws\.com|subscription' gitops/base/ \
+  && { echo "portability leak"; exit 1; } || echo "base is portable"
+
+# No removed Flux beta APIs (Alert/Provider on notification v1beta3 are current)
+grep -rnE 'toolkit\.fluxcd\.io/v(1beta[12]|2beta[12])\b' flux/ gitops/ \
+  && echo "deprecated Flux API versions found" || echo "clean"
 
 # Reconciliation health
 flux get all -A                     # Azure
@@ -470,10 +490,12 @@ be added as an external label at collection time, not by Kustomize.
 ### Cleaning up
 
 Do this the same day. Delete the capability before the cluster, or the capability
-deletion can be left orphaned:
+deletion can be left orphaned. Terraform's dependency graph already orders it
+that way, but destroying it explicitly first makes a failure easy to see:
 
 ```bash
 cd chapter08/iac/aws
+terraform destroy -auto-approve -target=module.argocd_capability -target=module.ack_capability
 terraform destroy -auto-approve
 
 cd ../azure
@@ -494,7 +516,7 @@ repositories with images can block destruction.
 | `ImagePullBackOff`/`ErrImagePull` on AKS | either the `AcrPull` role assignment has not yet propagated, **or** the overlay's `newName` still points at an ACR that no longer exists (common after re-provisioning: the ACR name is a random suffix, regenerated on every `terraform apply` from empty state) | wait a few minutes and verify `az role assignment list --scope <acr-id>`; also check `terraform output -raw acr_login_server` against `newName` in `gitops/overlays/azure/kustomization.yaml` |
 | Flux CRD errors mentioning `v1beta1` | manifests use APIs removed in extension 1.23.0 | migrate to `source/v1`, `kustomize/v1`, `helm/v2` |
 | Argo CD cannot reach the cluster | destination uses an API URL, not an ARN | use the cluster ARN; check the EKS access entry |
-| `Application` ignored | created outside the capability's namespace | move it into the configured namespace |
+| `Application` ignored | created in a namespace the capability does not watch | move it into the primary namespace, or enable that namespace in `argocd-cmd-params-cm` and the project's `spec.sourceNamespaces` |
 | GitHub Actions `AADSTS700213` / `AccessDenied` on OIDC | federated subject does not match the branch, **or** the repository has immutable OIDC subject claims enabled | check the `subject` in `ci-identity.tf` / `identity.tf` against the workflow ref; also check `gh api /repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix` and set `github_oidc_subject_prefix` if it returns one |
 | GitHub Actions `AADSTS700016: Application with identifier '***' was not found in the directory` | the `AZURE_CLIENT_ID` repository variable still names a CI identity that no longer exists — almost always because the cluster was rebuilt from scratch, which creates a brand new CI identity with a new client id | `gh variable set AZURE_CLIENT_ID --body "$(terraform output -raw ci_client_id)"`, then re-run the workflow |
 | `Kustomization`/`FluxConfig` `Missing required argument` for `azure_active_directory_role_based_access_control` | azurerm v4 requires `tenant_id` (or `admin_group_object_ids`) explicitly; it is no longer inferred | add a `data "azurerm_client_config" "current" {}` and set `tenant_id = data.azurerm_client_config.current.tenant_id` |
@@ -509,7 +531,7 @@ repositories with images can block destruction.
 | `Kustomization` won't pick up a new commit even after `flux reconcile --with-source`, `GitRepository` already shows the new revision | `spec.wait: true` + `force: false` (Azure's default) blocks a *running* reconcile — one stuck health-checking a bad prior revision — until its own timeout elapses; a new request just queues behind it | `kubectl -n flux-system delete pod -l app=kustomize-controller` to abort the stuck attempt immediately, rather than waiting out the `timeout_in_seconds` |
 | `OCIRepository` reports no matching signatures | the artifact was pushed but not signed | the `cosign sign` step in `ch08-build-azure.yml` must run after `flux push artifact` |
 | `{{ $labels.cloud }}` renders blank in an alert | no `cloud` external label configured | see `observability/README.md` |
-| Argo CD capability creation fails | Identity Center not enabled, or wrong region | enable Identity Center; create the capability in its region |
+| Argo CD capability creation fails | Identity Center not enabled, or its region does not match the one the configuration expects | enable Identity Center; check the Identity Center region against `region` and keep them aligned |
 
 ---
 

@@ -8,8 +8,10 @@
 #
 # Extension version note: microsoft.flux 1.23.0 (June 2026) REMOVED the
 # deprecated Flux beta APIs (source v1beta1/v1beta2, kustomize v1beta1/v1beta2,
-# helm v2beta1/v2beta2). Manifests written for the first edition will fail to
-# reconcile. Everything under ../flux uses the current APIs. Leaving
+# helm v2beta1/v2beta2, and the v1beta1 notification and image APIs). As of
+# October 2026, microsoft.flux 1.26.1 tracks upstream Flux v2.9.6. Manifests
+# written for the first edition will fail to reconcile. Everything under
+# ../flux uses the current APIs (Alert/Provider stay on v1beta3). Leaving
 # release_train on "stable" keeps the extension current; pin `version` instead
 # if you need a frozen environment.
 # -----------------------------------------------------------------------------
@@ -29,6 +31,10 @@ resource "azurerm_kubernetes_cluster_extension" "flux" {
     # being applied by a pipeline.
     "image-automation-controller.enabled" = "true"
     "image-reflector-controller.enabled"  = "true"
+
+    # Already the default; stated so that the alerting wiring in ../flux does
+    # not silently depend on it.
+    "notification-controller.enabled" = "true"
 
     # Multi-tenancy enforcement (cross-namespace source references refused) is
     # already the default. It is set explicitly here only to document the intent

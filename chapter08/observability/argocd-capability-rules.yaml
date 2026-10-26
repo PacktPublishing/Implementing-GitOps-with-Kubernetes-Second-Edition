@@ -1,0 +1,48 @@
+# Status-based rules for the EKS capability for Argo CD.
+#
+# Written against argocd_capability_app_info, which kube-state-metrics exports
+# from Application status using kube-state-metrics-argocd.yaml. Use
+# argocd-rules.yaml instead for self-managed Argo CD, where the controller
+# metrics can be scraped directly.
+#
+# `cloud` is an external label added at collection time (see README.md).
+groups:
+  - name: argocd-capability-reconciliation
+    interval: 1m
+    rules:
+      # With selfHeal enabled, OutOfSync should be transient. Sustained, it
+      # means something is fighting the reconciler or the sync is blocked.
+      - alert: ArgoCDCapabilityAppOutOfSync
+        expr: |
+          max by (exported_namespace, name, dest_name, cloud) (
+            argocd_capability_app_info{sync_status!="Synced"}
+          ) == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Argo CD application {{ $labels.name }} out of sync"
+          description: "Cluster {{ $labels.dest_name }} on {{ $labels.cloud }} does not match Git."
+
+      - alert: ArgoCDCapabilityAppDegraded
+        expr: |
+          max by (exported_namespace, name, dest_name, cloud) (
+            argocd_capability_app_info{health_status="Degraded"}
+          ) == 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Argo CD application {{ $labels.name }} degraded"
+
+      # The last sync operation failed or errored and has stayed that way.
+      - alert: ArgoCDCapabilitySyncFailing
+        expr: |
+          max by (exported_namespace, name, dest_name, cloud) (
+            argocd_capability_app_info{operation_phase=~"Error|Failed"}
+          ) == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last sync of {{ $labels.name }} failed"

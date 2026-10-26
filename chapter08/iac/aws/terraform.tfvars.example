@@ -1,5 +1,6 @@
 # Copy to terraform.tfvars and adjust. Never commit real values.
-# The region must match where AWS IAM Identity Center is configured.
+# Keep region aligned with the AWS IAM Identity Center region unless you have
+# a specific reason not to (the capability references IdC's region separately).
 region                       = "eu-central-1"
 idc_admin_group_display_name = "PlatformAdmins"
 github_repository            = "your-org/your-gitops-repo"
