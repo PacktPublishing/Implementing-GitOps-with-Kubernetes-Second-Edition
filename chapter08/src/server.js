@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -10,16 +11,18 @@ const revision = process.env.APP_REVISION || 'dev';
 
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 
+let dataAvailable = false;
+fs.access(path.join(__dirname, 'public', 'data.csv'), fs.constants.R_OK, (err) => {
+  dataAvailable = !err;
+});
+
 // Liveness: the process is up.
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }));
 
 // Readiness: the process is able to serve the data file.
-app.get('/readyz', (_req, res) => {
-  const fs = require('fs');
-  fs.access(path.join(__dirname, 'public', 'data.csv'), fs.constants.R_OK, (err) =>
-    err ? res.status(503).json({ status: 'unavailable' }) : res.status(200).json({ status: 'ready' })
-  );
-});
+app.get('/readyz', (_req, res) =>
+  dataAvailable ? res.status(200).json({ status: 'ready' }) : res.status(503).json({ status: 'unavailable' })
+);
 
 app.get('/api/info', (_req, res) => res.json({ cloud, revision }));
 

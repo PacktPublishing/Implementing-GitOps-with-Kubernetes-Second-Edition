@@ -1,0 +1,21 @@
+bootstrapValues:
+  applications:
+    - destination:
+        serverName: hub
+      info:
+        - name: type
+          value: app-of-apps
+      name: app-of-apps
+      namespace: argocd
+      projectName: hub-dev
+      repoUrl: https://github.com/la-cc/kubara-remote-university.git
+      repoPath: apps
+      ignoreDifferences:
+        - group: argoproj.io
+          kind: Application
+          jsonPointers:
+            - /status
+            - /metadata/resourceVersion
+            - /metadata/generation
+            - /metadata/managedFields
+            - /spec/ignoreDifferences

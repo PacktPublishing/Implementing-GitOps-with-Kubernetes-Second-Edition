@@ -1,0 +1,193 @@
+{
+  "uid": "shop-overview",
+  "id": null,
+  "version": 1,
+  "title": "Astronomy Shop - Overview",
+  "tags": ["shop", "otel"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": false,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values(kube_pod_info, namespace)", "refId": "ns" },
+        "refresh": 2,
+        "current": { "text": "shop", "value": "shop" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Running pods",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(kube_pod_status_phase{namespace=\"$namespace\", phase=\"Running\"})" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Not ready pods",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(kube_pod_status_ready{namespace=\"$namespace\", condition=\"false\"}) or vector(0)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Container restarts (1h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[1h])) or vector(0)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "CPU usage (cores)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[5m]))" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 2 }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "CPU by pod",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Memory by pod",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Available vs desired replicas",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (deployment) (kube_deployment_status_replicas_available{namespace=\"$namespace\"}) / sum by (deployment) (kube_deployment_spec_replicas{namespace=\"$namespace\"})",
+          "legendFormat": "{{deployment}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Network traffic by pod",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"$namespace\"}[5m]))",
+          "legendFormat": "rx {{pod}}"
+        },
+        {
+          "refId": "B",
+          "expr": "-sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"$namespace\"}[5m]))",
+          "legendFormat": "tx {{pod}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Recent traces (Tempo)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.k8s.namespace.name = \"$namespace\" }",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Traces with errors (Tempo)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.k8s.namespace.name = \"$namespace\" && status = error }",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ]
+    }
+  ]
+}

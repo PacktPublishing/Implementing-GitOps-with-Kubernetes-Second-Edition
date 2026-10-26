@@ -1,0 +1,12 @@
+---
+apiVersion: kubara.io/v1alpha1
+kind: ServiceDefinition
+metadata:
+  name: tempo
+  annotations:
+    kubara.io/category: observability
+spec:
+  chartPath: tempo
+  status: enabled
+  clusterTypes:
+    - hub

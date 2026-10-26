@@ -1,0 +1,90 @@
+{{- if and .Values.bestPractices.enabled (dig "bestPractices" "verifyImage" "enabled" true (merge .Values)) }}
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-image
+  annotations:
+    policies.kyverno.io/title: Verify Image
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/minversion: "1.17.0"
+    kyverno.io/kyverno-version: {{ .Values.global.kyvernoVersion | quote }}
+    kyverno.io/kubernetes-version: {{ .Values.global.k8sVersion | quote }}
+    policies.kyverno.io/description: >-
+      Using the Cosign project, OCI images may be signed to ensure supply chain
+      security is maintained. Those signatures can be verified before pulling into
+      a cluster. This policy checks the signature of images against provided public keys.
+spec:
+  failurePolicy: {{ dig "bestPractices" "verifyImage" "webhookFailurePolicy" "Ignore" (merge .Values) }}
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: {{ dig "bestPractices" "verifyImage" "enableBackgroundScanning" false (merge .Values) }}
+  validationActions:
+    - {{ $action := dig "bestPractices" "verifyImage" "actionOverride" "Audit" (merge .Values) }}{{ if eq $action "Enforce" }}Deny{{ else }}{{ $action }}{{ end }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+          - cronjobs
+    {{- if (hasKey (dig "bestPractices" "verifyImage" dict (merge .Values)) "excludeNamespaces") }}
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            {{- range (dig "bestPractices" "verifyImage" "excludeNamespaces" list (merge .Values)) }}
+            - {{ . | quote }}
+            {{- end }}
+    {{- end }}
+  matchImageReferences:
+    {{- range (dig "bestPractices" "verifyImage" "imagesAndPublicKeyPairs" list (merge .Values)) }}
+    - glob: {{ .image | quote }}
+    {{- end }}
+  attestors:
+    {{- range $i, $item := (dig "bestPractices" "verifyImage" "imagesAndPublicKeyPairs" list (merge .Values)) }}
+    - name: attestor_{{ $i }}
+      cosign:
+        key:
+          data: |-
+{{ $item.key | indent 12 }}
+      {{- if $item.pullSecret }}
+      credentials:
+        secrets:
+          - {{ $item.pullSecret }}
+      {{- end }}
+    {{- end }}
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [{{ range $i, $item := (dig "bestPractices" "verifyImage" "imagesAndPublicKeyPairs" list (merge .Values)) }}{{ if $i }}, {{ end }}attestors.attestor_{{ $i }}{{ end }}])).all(e, e > 0)
+      message: "Image signature verification failed."
+{{- end }}

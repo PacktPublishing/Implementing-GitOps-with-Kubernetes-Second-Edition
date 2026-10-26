@@ -1,0 +1,9 @@
+apiVersion: v2
+name: opentelemetry-collector
+description: Umbrella chart for the OpenTelemetry Collector (OTLP gateway for traces and metrics)
+type: application
+version: 1.0.0
+dependencies:
+  - name: opentelemetry-collector
+    repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+    version: 0.176.0

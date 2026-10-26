@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: shop-observability
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            shop: enabled
+  template:
+    metadata:
+      name: "shop-observability-{{name}}"
+    spec:
+      project: hub-dev
+      source:
+        repoURL: https://github.com/la-cc/kubara-remote-university.git
+        targetRevision: main
+        path: examples/astronomy-shop-observability
+      destination:
+        name: "{{name}}"
+        namespace: shop
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,52 @@
+{{- if and .Values.certManager.enabled (dig "certManager" "restrictIssuer" "enabled" true (merge .Values)) .Values.global.allowedIssuerDomains }}
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: cert-manager-restrict-issuer
+  annotations:
+    policies.kyverno.io/title: Restrict issuer
+    policies.kyverno.io/category: Cert-Manager
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/minversion: "1.17.0"
+    kyverno.io/kyverno-version: {{ .Values.global.kyvernoVersion | quote }}
+    kyverno.io/kubernetes-version: {{ .Values.global.k8sVersion | quote }}
+    policies.kyverno.io/subject: Certificate
+    policies.kyverno.io/description: >-
+      Certificates for trusted domains should always be steered to a controlled issuer to
+      ensure the chain of trust is appropriate for that application. Users may otherwise be
+      able to create their own issuers and sign certificates for other domains. This policy
+      ensures that a certificate request for a specific domain uses a designated ClusterIssuer.
+spec:
+  failurePolicy: {{ dig "certManager" "restrictIssuer" "webhookFailurePolicy" "Fail" (merge .Values) }}
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: {{ dig "certManager" "restrictIssuer" "enableBackgroundScanning" true (merge .Values) }}
+  validationActions:
+    - {{ $action := dig "certManager" "restrictIssuer" "actionOverride" "Audit" (merge .Values) }}{{ if eq $action "Enforce" }}Deny{{ else }}{{ $action }}{{ end }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - cert-manager.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - certificates
+  {{- if .Values.global.allowedIssuerDomains }}
+  matchConditions:
+    - name: matches-restricted-domain
+      expression: >-
+        object.spec.?dnsNames.orValue([]).exists(dns, dns.matches({{ regexReplaceAll "\\*" (regexReplaceAll "\\." (regexReplaceAll "\\|" (default ".*" .Values.global.allowedIssuerDomains) "$|^.*") "\\.") ".*" | quote }}))
+  {{- end }}
+  validations:
+    - expression: >-
+        has(object.spec.issuerRef) &&
+        object.spec.issuerRef.?name.orValue('') == 'our-corp-issuer' &&
+        object.spec.issuerRef.?kind.orValue('') == 'ClusterIssuer' &&
+        object.spec.issuerRef.?group.orValue('') == 'cert-manager.io'
+      message: "When requesting a cert for this domain, you must use our corporate issuer (our-corp-issuer)."
+{{- end }}

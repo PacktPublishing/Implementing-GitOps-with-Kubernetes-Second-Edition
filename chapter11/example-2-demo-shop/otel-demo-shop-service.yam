@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop
+  namespace: shop
+spec:
+  selector:
+    opentelemetry.io/name: frontend-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: shop
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - shop.hub-dev.stackit.run
+      secretName: shop-tls
+  rules:
+    - host: shop.hub-dev.stackit.run
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shop
+                port:
+                  number: 80

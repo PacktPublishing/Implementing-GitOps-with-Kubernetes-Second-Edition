@@ -1,0 +1,23 @@
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      enableRemoteWriteReceiver: true
+  grafana:
+    # Lists are replaced by Helm, so loki from values.generated.yaml is repeated here
+    additionalDataSources:
+      - access: proxy
+        isDefault: false
+        name: loki
+        type: loki
+        url: http://loki-headless.loki.svc.cluster.local:3100
+        version: 1
+      - access: proxy
+        isDefault: false
+        name: Tempo
+        uid: tempo
+        type: tempo
+        url: http://tempo.tempo.svc.cluster.local:3200
+        version: 1
+        jsonData:
+          nodeGraph:
+            enabled: true
