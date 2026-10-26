@@ -13,8 +13,10 @@ variable "cluster_name" {
 variable "kubernetes_version" {
   description = <<-EOT
     EKS Kubernetes minor version. 1.34 is in standard support until December 2026;
-    1.35 and 1.36 are also available. The first edition pinned 1.29, which left
-    standard support long ago.
+    1.35, 1.36 and 1.37 are also available. The first edition pinned 1.29, which
+    left standard support long ago. EKS gives 14 months of standard support, then
+    an optional 12 months of extended support at extra cost. Check the current
+    matrix before you pin.
   EOT
   type        = string
   default     = "1.34"
@@ -29,7 +31,7 @@ variable "instance_types" {
 variable "gitops_repository_url" {
   description = "HTTPS URL of the Git repository Argo CD reconciles."
   type        = string
-  default     = "https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git"
+  default     = "https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git"
 }
 
 variable "gitops_branch" {
@@ -41,14 +43,15 @@ variable "gitops_branch" {
 variable "github_repository" {
   description = "owner/repo allowed to federate into the CI role (keyless push to ECR)."
   type        = string
-  default     = "PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd"
+  default     = "PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition"
 }
 
 variable "argocd_namespace" {
   description = <<-EOT
-    Namespace holding Application, ApplicationSet and AppProject objects.
-    The EKS capability for Argo CD confines them to a single namespace, unlike
-    self-managed Argo CD.
+    Primary namespace of the EKS capability for Argo CD. AppProjects must live
+    here; Applications and ApplicationSets use it by default and may use
+    additional namespaces once enabled in argocd-cmd-params-cm and permitted by
+    the AppProject's spec.sourceNamespaces.
   EOT
   type        = string
   default     = "argocd"

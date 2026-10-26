@@ -21,6 +21,11 @@ output "ci_client_id" {
   value       = azurerm_user_assigned_identity.ci.client_id
 }
 
+output "ci_pr_client_id" {
+  description = "Client ID of the separate pull-request identity (no AcrPush). Use only in pull-request workflows."
+  value       = azurerm_user_assigned_identity.ci_pr.client_id
+}
+
 output "prometheus_query_endpoint" {
   value = azurerm_monitor_workspace.prometheus.query_endpoint
 }

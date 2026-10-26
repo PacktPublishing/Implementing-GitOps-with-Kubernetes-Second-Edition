@@ -7,12 +7,12 @@ resources:
 variables:
 
   # Container registry service connection established during pipeline creation
-  dockerRegistryServiceConnection: 'dd42c99b-7b18-42ae-9fe8-fa42ecd0bc04'
+  dockerRegistryServiceConnection: '00000000-0000-0000-0000-000000000000'
   imageRepository: 'myweatherappv1'
-  containerRegistry: 'aksgitops3003204acr.azurecr.io'
+  containerRegistry: 'yourregistryname.azurecr.io'
   dockerfilePath: '**/src/dockerfile'
   tag: '$(Build.BuildId)'
-  imagePullSecret: 'aksgitops3003204acra253-auth'
+  imagePullSecret: 'yourregistrynamea253-auth'
 
   # Agent VM image name
   vmImageName: 'ubuntu-latest'

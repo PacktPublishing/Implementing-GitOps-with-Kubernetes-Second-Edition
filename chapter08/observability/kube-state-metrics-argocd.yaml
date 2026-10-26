@@ -1,0 +1,42 @@
+# kube-state-metrics values for the EKS capability for Argo CD.
+#
+# The capability runs the Argo CD controllers outside your cluster, so the
+# upstream argocd_app_info / argocd_app_sync_total metrics cannot be scraped.
+# The Application objects do live in your cluster, so kube-state-metrics can
+# export their status as argocd_capability_app_info, which
+# argocd-capability-rules.yaml alerts on.
+#
+# Merge into the kube-state-metrics (or kube-prometheus-stack) Helm values next
+# to the Flux custom-resource-state configuration. The structure mirrors the
+# Flux monitoring example. Do not assume upstream Argo CD metric names exist.
+kube-state-metrics:
+  rbac:
+    extraRules:
+      - apiGroups: ["argoproj.io"]
+        resources: ["applications"]
+        verbs: ["list", "watch"]
+  customResourceState:
+    enabled: true
+    config:
+      spec:
+        resources:
+          - groupVersionKind:
+              group: argoproj.io
+              version: v1alpha1
+              kind: Application
+            metricNamePrefix: argocd_capability
+            metrics:
+              - name: "app_info"
+                help: "Sync, health and last operation state of an Argo CD Application."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  project: [spec, project]
+                  dest_name: [spec, destination, name]
+                  sync_status: [status, sync, status]
+                  health_status: [status, health, status]
+                  operation_phase: [status, operationState, phase]

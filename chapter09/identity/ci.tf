@@ -8,7 +8,9 @@
 # the resources themselves, and no write access anywhere.
 #
 # It is a separate identity from the runner's on purpose. The runner has
-# Contributor; the pull request gate must not.
+# Contributor; the pull request gate must not. Its OIDC trust is limited to one
+# repository and one protected GitHub environment (var.ci_environment), so only
+# an approved plan job can use it.
 #
 # Created only when github_repository is set, e.g. "my-org/my-fork".
 # -----------------------------------------------------------------------------
@@ -37,17 +39,20 @@ locals {
   )
 }
 
-# GitHub's OIDC subject for a workflow triggered by pull_request is
-# repo:<owner>/<repo>:pull_request. Pull requests from forks get no OIDC token
-# at all, which is the behaviour we want.
-resource "azurerm_federated_identity_credential" "ci_pull_request" {
+# Trust only the protected GitHub environment the plan job runs in. A job that
+# declares `environment:` presents the subject
+# repo:<owner>/<repo>:environment:<name>, so this credential cannot be used by
+# an ungated pull_request job, which presents repo:<owner>/<repo>:pull_request.
+# The environment's required reviewers are what release a plan against real
+# production state. Pull requests from forks get no OIDC token at all.
+resource "azurerm_federated_identity_credential" "ci_plan_environment" {
   count = var.github_repository == null ? 0 : 1
 
-  name                      = "github-pull-request"
+  name                      = "github-env-${var.ci_environment}"
   user_assigned_identity_id = azurerm_user_assigned_identity.ci[0].id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = "https://token.actions.githubusercontent.com"
-  subject                   = "${local.github_oidc_subject_prefix}:pull_request"
+  subject                   = "${local.github_oidc_subject_prefix}:environment:${var.ci_environment}"
 }
 
 resource "azurerm_role_assignment" "ci_state_reader" {

@@ -33,7 +33,7 @@ variable "kubernetes_version" {
 }
 
 variable "node_count" {
-  description = "System node pool size. One node is enough for the chapter walkthrough."
+  description = "System node pool size (autoscaler minimum). Two nodes let the topology spread constraint place one replica per node."
   type        = number
   default     = 2
 }
@@ -47,7 +47,7 @@ variable "node_vm_size" {
 variable "gitops_repository_url" {
   description = "HTTPS URL of the Git repository that Flux reconciles."
   type        = string
-  default     = "https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git"
+  default     = "https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git"
 }
 
 variable "gitops_branch" {
@@ -79,7 +79,7 @@ variable "gitops_path" {
 variable "github_repository" {
   description = "owner/repo allowed to federate into the CI identity (keyless push to ACR)."
   type        = string
-  default     = "PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd"
+  default     = "PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition"
 }
 
 variable "github_oidc_subject_prefix" {

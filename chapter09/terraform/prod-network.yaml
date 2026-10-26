@@ -31,7 +31,7 @@ spec:
   # It has the form plan-infra-v1.0.0-<10 hex characters>. Copy it exactly --
   # the controller compares the whole string -- and commit it to main.
   # Leave empty ("") to hold everything at plan.
-  approvePlan: "plan-infra-v1.0.0-98a7a841f6"
+  approvePlan: ""
 
   path: ./chapter09/iac/azure/prod/network
 
@@ -43,12 +43,12 @@ spec:
   backendConfig:
     customConfiguration: |
       backend "azurerm" {
-        resource_group_name  = "gitops-tfstate-rg"
-        storage_account_name = "<tfstate-storage-account>"
-        container_name       = "tfstate"
-        key                  = "prod/network.tfstate"
-        use_oidc             = true
-        use_azuread_auth     = true
+        resource_group_name       = "gitops-tfstate-rg"
+        storage_account_name      = "REPLACE_WITH_YOUR_STATE_ACCOUNT"
+        container_name            = "tfstate"
+        key                       = "prod/network.tfstate"
+        use_aks_workload_identity = true
+        use_azuread_auth          = true
       }
 
   # The root carries an empty backend "azurerm" {} block (backend.tf) so that
@@ -60,10 +60,12 @@ spec:
   # Storage account names are globally unique, so the value above cannot ship
   # working. Take it from the bootstrap step:
   #   tofu -chdir=chapter09/identity output -raw state_storage_account_name
-  # use_oidc and use_azuread_auth mean the backend authenticates with the same
-  # federated identity as the provider, so remote state does not reintroduce a
-  # storage account key. The bootstrap account sets
-  # shared_access_key_enabled = false, which makes that non-negotiable.
+  # use_aks_workload_identity and use_azuread_auth mean the backend
+  # authenticates with the same federated identity as the provider, so remote
+  # state does not reintroduce a storage account key. The bootstrap account
+  # sets shared_access_key_enabled = false, which makes that non-negotiable.
+  # The runner identity holds Storage Blob Data Contributor on the state
+  # account (identity/main.tf); subscription Contributor does not grant it.
 
   tfstate:
     # Never "auto" in production. A stuck lock is a signal, not a nuisance.
@@ -87,10 +89,11 @@ spec:
         azure.workload.identity/use: "true"
     spec:
       env:
-        - name: ARM_USE_OIDC
+        # AKS workload identity: the webhook injects AZURE_CLIENT_ID,
+        # AZURE_TENANT_ID and AZURE_FEDERATED_TOKEN_FILE from the annotated
+        # service account, so no token path is hard-coded here.
+        - name: ARM_USE_AKS_WORKLOAD_IDENTITY
           value: "true"
-        - name: ARM_OIDC_TOKEN_FILE_PATH
-          value: /var/run/secrets/azure/tokens/azure-identity-token
         - name: ARM_SUBSCRIPTION_ID
           valueFrom:
             configMapKeyRef:

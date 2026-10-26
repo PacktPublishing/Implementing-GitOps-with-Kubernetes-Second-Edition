@@ -3,6 +3,12 @@
 # into the azurerm provider; AWS annotates the tf-runner service account with
 # an IAM role and the SDK does the rest.
 #
+# Create the IAM role FIRST: it needs the permissions this module requires and
+# a trust policy scoped to the cluster's OIDC provider and the subject
+# system:serviceaccount:flux-system:tf-runner. The two commands below
+# associate the OIDC provider and annotate the service account; neither one
+# creates the role.
+#
 #   eksctl utils associate-iam-oidc-provider --cluster <name> --approve
 #   kubectl annotate -n flux-system serviceaccount tf-runner \
 #     eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/tf-runner

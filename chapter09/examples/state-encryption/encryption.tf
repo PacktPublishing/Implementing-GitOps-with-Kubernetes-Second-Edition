@@ -28,8 +28,8 @@ variable "state_key_name" {
 terraform {
   encryption {
     # Authentication follows the azurerm backend: in the runner pod that is
-    # the federated token (ARM_USE_OIDC, ARM_OIDC_TOKEN_FILE_PATH), locally it
-    # is your Azure CLI session. The identity needs keys/read, wrap and unwrap
+    # AKS workload identity (ARM_USE_AKS_WORKLOAD_IDENTITY), locally it is
+    # your Azure CLI session. The identity needs keys/read, wrap and unwrap
     # on the key ("Key Vault Crypto Service Encryption User").
     key_provider "azure_vault" "primary" {
       vault_uri      = var.key_vault_uri

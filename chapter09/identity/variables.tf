@@ -58,6 +58,16 @@ variable "github_oidc_subject_prefix" {
   default     = null
 }
 
+variable "ci_environment" {
+  description = <<-EOT
+    Name of the protected GitHub environment the IaC policy workflow's plan job
+    runs in. The CI identity trusts only repo:<owner>/<repo>:environment:<name>.
+    Create the environment with required reviewers before opening a pull request.
+  EOT
+  type        = string
+  default     = "iac-plan"
+}
+
 variable "enable_state_encryption" {
   description = "Create a Key Vault and key for OpenTofu state encryption. See state-encryption.tf."
   type        = bool

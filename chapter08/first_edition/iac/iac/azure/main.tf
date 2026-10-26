@@ -6,7 +6,7 @@ resource "azurerm_resource_group" "aks" {
 
 # Create Azure Container Registry
 resource "azurerm_container_registry" "acr" {
-  name                = "aksgitops3003204acr"
+  name                = "yourregistryname"
   resource_group_name = azurerm_resource_group.aks.name
   location            = azurerm_resource_group.aks.location
   sku                 = "Basic"

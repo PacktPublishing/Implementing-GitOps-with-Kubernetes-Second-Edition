@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: my-city-weather-app
-        image: 637423230075.dkr.ecr.eu-central-1.amazonaws.com/weather-app:latest
+        image: ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/weather-app:latest
         ports:
         - containerPort: 8080

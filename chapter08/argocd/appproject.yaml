@@ -6,7 +6,7 @@ metadata:
 spec:
   description: Chapter 8 multi-cloud sample
   sourceRepos:
-    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-2nd.git
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
   destinations:
     - namespace: weather-app
       name: "*"

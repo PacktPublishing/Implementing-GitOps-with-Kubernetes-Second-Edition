@@ -3,7 +3,8 @@
 # writes the new reference back to Git as a commit.
 #
 # API note: ImageRepository, ImagePolicy and ImageUpdateAutomation were promoted
-# to stable v1 in Flux 2.7, which is what microsoft.flux 1.24.0 ships.
+# to stable v1 in Flux 2.7. As of October 2026, microsoft.flux 1.26.1 tracks
+# upstream Flux v2.9.6.
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository

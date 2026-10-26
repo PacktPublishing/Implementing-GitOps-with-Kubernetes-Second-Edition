@@ -15,7 +15,7 @@
 #
 # Build:
 #   export TF_CONTROLLER_VERSION=v0.16.5
-#   export TOFU_VERSION=1.12.6
+#   export TOFU_VERSION=1.12.9
 #   docker build \
 #     --build-arg BASE_IMAGE=ghcr.io/flux-iac/tf-runner:${TF_CONTROLLER_VERSION}-base \
 #     --build-arg TOFU_VERSION=${TOFU_VERSION} \
@@ -23,7 +23,7 @@
 # -----------------------------------------------------------------------------
 
 ARG BASE_IMAGE
-ARG TOFU_VERSION=1.12.6
+ARG TOFU_VERSION=1.12.9
 
 FROM ghcr.io/opentofu/opentofu:${TOFU_VERSION}-minimal AS tofu
 

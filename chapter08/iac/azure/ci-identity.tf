@@ -38,9 +38,25 @@ resource "azurerm_federated_identity_credential" "github_main" {
   subject                   = "${local.github_oidc_subject_prefix}:ref:refs/heads/${var.gitops_branch}"
 }
 
+# -----------------------------------------------------------------------------
+# Pull-request validation: a SEPARATE, least-privileged identity
+#
+# The pull_request subject must never be federated into the publishing identity
+# above, because that identity holds AcrPush. This identity has no role
+# assignment at all; grant it only what your pull-request checks need (for
+# example Reader on a resource group), and never AcrPush.
+# -----------------------------------------------------------------------------
+
+resource "azurerm_user_assigned_identity" "ci_pr" {
+  name                = "id-${var.cluster_name}-ci-pr"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  tags                = var.tags
+}
+
 resource "azurerm_federated_identity_credential" "github_pr" {
   name                      = "github-pull-request"
-  user_assigned_identity_id = azurerm_user_assigned_identity.ci.id
+  user_assigned_identity_id = azurerm_user_assigned_identity.ci_pr.id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = "https://token.actions.githubusercontent.com"
   subject                   = "${local.github_oidc_subject_prefix}:pull_request"

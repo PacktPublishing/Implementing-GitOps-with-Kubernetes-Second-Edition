@@ -4,8 +4,6 @@ Chart.lock
 
 # Docker
 .DS_Store
-.dockerignore
-docker-compose.yml
 # Kubernetes
 *.env
 # macOS
@@ -86,3 +84,19 @@ bin/
 **/tfplan
 **/plan.json
 **/terraform.tfvars
+
+# --- Chapter 8/9 additions ---
+# Editor / tooling leftovers (e.g. `sed -i.bak` in the chapter READMEs)
+*.bak
+*.orig
+*~
+# Kubeconfig files
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+# Terraform / OpenTofu: lock files are not committed in this book repo
+**/.terraform.lock.hcl
+**/*.auto.tfvars
+# Override files: Tofu Controller writes the real backend to backend_override.tf
+**/override.tf
+**/*_override.tf
