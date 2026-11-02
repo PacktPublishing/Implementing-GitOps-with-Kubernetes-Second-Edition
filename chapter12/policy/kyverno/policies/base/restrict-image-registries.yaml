@@ -1,0 +1,43 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Image Registries
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    # Tenant workloads only: platform components pull from their upstream
+    # registries and are governed by the platform project instead.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno, external-secrets, argocd, argocd-impersonation,
+                   flux-system, gatekeeper-system, sealed-secrets]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: allowed
+      # Regular expressions for the Chapter 8 registries (ACR and ECR).
+      expression: >-
+        ['^gitopsch08[a-zA-Z0-9]+\\.azurecr\\.io/',
+         '^[0-9]{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/']
+    - name: containers
+      expression: >-
+        object.spec.containers + object.spec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.containers.all(c, variables.allowed.exists(r, c.image.matches(r)))
+      message: Images must come from the approved ACR or ECR registries.

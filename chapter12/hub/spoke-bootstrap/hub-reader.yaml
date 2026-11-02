@@ -1,0 +1,31 @@
+# What the hub itself may do on a remote spoke: read everything (to build its
+# cache and compute diffs) and impersonate the named sync identities.
+# Every write is made as one of those service accounts, never as the hub.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-hub-reader
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["*"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["impersonate"]
+    resourceNames: ["platform-installer", "team-a-deployer"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-hub-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-hub-reader
+subjects:
+  # EKS: the access entry in hub/iac maps the hub's IAM role to this group.
+  - kind: Group
+    name: argocd-hub
+    apiGroup: rbac.authorization.k8s.io

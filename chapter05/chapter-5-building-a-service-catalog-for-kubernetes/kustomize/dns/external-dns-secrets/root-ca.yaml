@@ -1,3 +1,9 @@
+# TEMPLATE ONLY - do not commit real values in this file.
+# A plaintext Secret in Git is readable by everyone who can clone the repository.
+# Replace this file with a SealedSecret (or a SOPS-encrypted Secret) of the same name:
+#   kubectl create secret generic root-ca -n external-dns --from-file=ca.crt=./ca.crt \
+#     --dry-run=client -o yaml | kubeseal --format yaml > root-ca.yaml
+# See Chapter 12, "Managing secrets securely in GitOps workflows".
 apiVersion: v1
 kind: Secret
 metadata:

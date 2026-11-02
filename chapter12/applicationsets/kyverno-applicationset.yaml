@@ -1,0 +1,44 @@
+# Define once, deploy everywhere: Kyverno plus the policy overlay that matches
+# each cluster's 'environment' label (development or production).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kyverno
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: environment
+              operator: In
+              values: [development, production]
+  template:
+    metadata:
+      name: 'kyverno-{{.name}}'
+    spec:
+      project: platform-security
+      sources:
+        - repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+          targetRevision: main
+          path: chapter12/policy/kyverno
+          helm:
+            releaseName: kyverno
+            valueFiles: [values.yaml]
+        - repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+          targetRevision: main
+          path: 'chapter12/policy/kyverno/policies/overlays/{{index .metadata.labels "environment"}}'
+      destination:
+        name: '{{.name}}'
+        namespace: kyverno
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          # Policies are applied in the same sync as the CRDs that define them.
+          - SkipDryRunOnMissingResource=true

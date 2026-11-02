@@ -1,0 +1,14 @@
+# Argo CD 3.5.6, non-HA, pinned to the release tag. Apply with server-side
+# apply: the ApplicationSet CRD is too large for client-side apply.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.6/manifests/install.yaml
+patches:
+  - path: argocd-cm.yaml
+  - path: argocd-rbac-cm.yaml
+  - path: argocd-server-serviceaccount.yaml
+  - path: argocd-server.yaml
+  - path: argocd-application-controller.yaml
+  - path: argocd-applicationset-controller.yaml

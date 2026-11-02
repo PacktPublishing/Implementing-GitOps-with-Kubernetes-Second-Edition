@@ -1,0 +1,12 @@
+# Everything the hub needs, reconciled by the hub itself after bootstrap.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - install
+  - ../spoke-bootstrap          # the hub's own cluster is a spoke too
+  - clusters/aks-gitops-ch08.yaml
+  - clusters/eks-gitops-ch08.yaml
+  - appproject-platform-hub.yaml
+  - argocd-self.yaml
+  - ../../applicationsets

@@ -1,0 +1,6 @@
+# Separation of duties: who must approve which part of the platform.
+/chapter12/policy/                       @example-org/security-team
+/chapter12/policy/kyverno/exceptions/    @example-org/security-team @example-org/platform-team
+/chapter12/identity/                     @example-org/platform-team @example-org/security-team
+/chapter12/secrets/external-secrets/platform/ @example-org/platform-team
+/chapter12/applicationsets/              @example-org/platform-team

@@ -1,0 +1,13 @@
+# Production: the same policies, enforced. Only the action changes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target:
+      group: policies.kyverno.io
+      kind: ValidatingPolicy
+    patch: |
+      - op: replace
+        path: /spec/validationActions
+        value: [Deny]

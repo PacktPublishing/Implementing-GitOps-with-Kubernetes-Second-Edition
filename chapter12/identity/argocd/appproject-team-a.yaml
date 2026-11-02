@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-a
+  namespace: argocd
+spec:
+  description: Team A applications
+  sourceRepos:
+    - https://github.com/example-org/team-a-apps.git
+  destinations:
+    - name: "*"
+      namespace: team-a
+  # Sync as a namespace-scoped service account, not as the Argo CD controller.
+  destinationServiceAccounts:
+    - server: "*"
+      namespace: team-a
+      defaultServiceAccount: team-a-deployer
+  # No cluster-scoped resources at all.
+  clusterResourceWhitelist: []
+  # Guardrails stay with the platform team.
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  roles:
+    - name: deployer
+      description: Sync and inspect Team A applications
+      policies:
+        - p, proj:team-a:deployer, applications, get, team-a/*, allow
+        - p, proj:team-a:deployer, applications, sync, team-a/*, allow
+        # Argo CD 3.x: update/delete no longer cascade to managed resources.
+        - p, proj:team-a:deployer, applications, update/*, team-a/*, allow
+        - p, proj:team-a:deployer, logs, get, team-a/*, allow
+      groups:
+        - REPLACE_WITH_TEAM_A_GROUP_ID

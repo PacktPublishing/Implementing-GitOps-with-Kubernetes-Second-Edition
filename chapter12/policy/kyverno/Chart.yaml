@@ -1,0 +1,8 @@
+apiVersion: v2
+name: kyverno
+version: 2.0.0
+description: Kyverno policy engine (CEL policy types)
+dependencies:
+  - name: kyverno
+    version: 3.9.0            # Kyverno v1.19; check with: helm show chart kyverno/kyverno --version 3.9.0
+    repository: https://kyverno.github.io/kyverno/

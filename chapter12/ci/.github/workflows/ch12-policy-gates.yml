@@ -1,0 +1,80 @@
+# Copy to .github/workflows/ at the repository root.
+# Three gates, all offline, none needing cloud or cluster credentials.
+name: ch12-policy-gates
+
+on:
+  pull_request:
+    paths:
+      - "chapter12/**"
+      - "chapter08/gitops/**"
+
+permissions:
+  contents: read
+
+env:
+  KYVERNO_VERSION: v1.19.0
+  GITLEAKS_VERSION: 8.28.0
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # scan the whole PR history, not just the tip
+      - name: gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz gitleaks
+          ./gitleaks git --redact --log-opts="origin/${{ github.base_ref }}..HEAD" .
+
+  no-plaintext-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every Secret manifest must be SOPS-encrypted
+        shell: python3 {0}
+        run: |
+          # Parses every YAML document instead of grepping, so quoting, .yml,
+          # multi-document files and renamed files cannot slip through.
+          import pathlib, sys, yaml
+          # Argo CD cluster and repository declarations may be plain Secrets,
+          # but only if they carry no credential fields.
+          ALLOWED = {"name", "server", "config", "url", "type", "project", "enableOCI"}
+          FORBIDDEN = ("bearerToken", "password", "keyData", "sshPrivateKey", "clientSecret")
+          bad = 0
+          roots = [pathlib.Path(r) for r in ("chapter12", "chapter08")]
+          for f in [p for r in roots for ext in ("*.yaml", "*.yml") for p in r.rglob(ext)]:
+              if ".git" in f.parts:
+                  continue
+              try:
+                  docs = list(yaml.safe_load_all(f.read_text()))
+              except yaml.YAMLError:
+                  continue
+              for d in docs:
+                  if not isinstance(d, dict) or d.get("kind") != "Secret" or "sops" in d:
+                      continue
+                  labels = (d.get("metadata") or {}).get("labels") or {}
+                  fields = {**(d.get("data") or {}), **(d.get("stringData") or {})}
+                  argo = "argocd.argoproj.io/secret-type" in labels
+                  if argo and set(fields) <= ALLOWED and not any(k in str(fields) for k in FORBIDDEN):
+                      continue
+                  print(f"::error file={f}::unencrypted Secret '{(d.get('metadata') or {}).get('name')}'")
+                  bad = 1
+          sys.exit(bad)
+
+  policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Kyverno CLI
+        run: |
+          curl -sSfL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" | tar xz kyverno
+          sudo mv kyverno /usr/local/bin/
+      - name: Unit-test the policies
+        run: kyverno test chapter12/policy/kyverno/tests --warnings-as-errors
+      - name: Evaluate a real application against the production policies
+        run: |
+          # The Chapter 8 weather-app, rendered exactly as the cluster sees it.
+          kubectl kustomize chapter12/policy/kyverno/policies/overlays/production > /tmp/policies.yaml
+          kubectl kustomize chapter08/gitops/overlays/azure > /tmp/weather-app.yaml
+          kyverno apply /tmp/policies.yaml --resource /tmp/weather-app.yaml --warnings-as-errors

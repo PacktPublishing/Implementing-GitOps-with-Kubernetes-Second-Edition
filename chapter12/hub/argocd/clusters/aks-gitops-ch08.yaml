@@ -1,0 +1,21 @@
+# The hub's own cluster, declared so that it carries the labels the
+# ApplicationSets select on. No credentials: in-cluster uses the service account.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-aks-gitops-ch08
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    cloud: azure
+    environment: development
+type: Opaque
+stringData:
+  name: aks-gitops-ch08
+  server: https://kubernetes.default.svc
+  config: |
+    {
+      "tlsClientConfig": {
+        "insecure": false
+      }
+    }

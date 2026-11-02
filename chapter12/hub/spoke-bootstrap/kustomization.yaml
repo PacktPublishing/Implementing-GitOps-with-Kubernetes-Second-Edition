@@ -1,0 +1,7 @@
+# Applied once to every cluster the hub manages, by a cluster administrator,
+# as part of registering it. The hub delivers it to its own cluster itself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - platform-installer.yaml
+  - hub-reader.yaml

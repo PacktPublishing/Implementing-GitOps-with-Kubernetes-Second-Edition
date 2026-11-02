@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-hub
+  namespace: argocd
+spec:
+  project: platform-hub
+  source:
+    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    targetRevision: main
+    path: chapter12/hub/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false          # never let a bad commit delete the hub
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

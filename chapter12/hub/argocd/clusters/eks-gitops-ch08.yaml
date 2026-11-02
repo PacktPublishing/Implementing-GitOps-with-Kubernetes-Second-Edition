@@ -1,0 +1,28 @@
+# The Chapter 8 EKS cluster as a spoke of the AKS hub. Nothing secret here:
+# argocd-k8s-auth signs an EKS token with the federated AWS credentials of
+# the calling pod. Fill server and caData from:
+#   aws eks describe-cluster --name eks-gitops-ch08 \
+#     --query 'cluster.[endpoint,certificateAuthority.data]' --output text
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-eks-gitops-ch08
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    cloud: aws
+    environment: production
+type: Opaque
+stringData:
+  name: eks-gitops-ch08
+  server: REPLACE_WITH_EKS_ENDPOINT
+  config: |
+    {
+      "awsAuthConfig": {
+        "clusterName": "eks-gitops-ch08"
+      },
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "REPLACE_WITH_BASE64_CA"
+      }
+    }

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: gatekeeper
+version: 2.0.0
+description: OPA Gatekeeper (do not combine with the AKS Azure Policy add-on, which installs its own Gatekeeper)
+dependencies:
+  - name: gatekeeper
+    version: 3.23.1
+    repository: https://open-policy-agent.github.io/gatekeeper/charts
