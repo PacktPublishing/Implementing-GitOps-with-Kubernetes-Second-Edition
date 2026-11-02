@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-security
+  namespace: argocd
+spec:
+  description: Secrets, identity and policy baseline for every cluster
+  sourceRepos:
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    - https://charts.external-secrets.io
+    - https://kyverno.github.io/kyverno/
+  destinations:
+    - name: "*"
+      namespace: external-secrets
+    - name: "*"
+      namespace: kyverno
+    - name: "*"
+      namespace: policy-exceptions
+  # Required once argocd-cm enables sync impersonation (enforced since 3.5).
+  # platform-installer is created on every cluster by hub/spoke-bootstrap.
+  destinationServiceAccounts:
+    - server: "*"
+      namespace: "*"
+      defaultServiceAccount: argocd-impersonation:platform-installer
+  # Policy engines need cluster-scoped objects; list them explicitly.
+  clusterResourceWhitelist:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: admissionregistration.k8s.io
+      kind: "*"
+    - group: policies.kyverno.io
+      kind: "*"
+    - group: external-secrets.io
+      kind: "*"
+    - group: ""
+      kind: Namespace

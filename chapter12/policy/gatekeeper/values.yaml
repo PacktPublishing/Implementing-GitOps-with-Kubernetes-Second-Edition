@@ -1,0 +1,7 @@
+gatekeeper:
+  replicas: 3
+  auditInterval: 60
+  # Never evaluate Gatekeeper's own namespace or kube-system.
+  exemptNamespaces:
+    - gatekeeper-system
+    - kube-system

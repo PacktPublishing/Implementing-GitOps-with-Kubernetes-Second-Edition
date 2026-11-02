@@ -1,0 +1,47 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdisallowedtags
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDisallowedTags
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            tags:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdisallowedtags
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          ref := image_ref(container.image)
+          not has_tag_or_digest(ref)
+          msg := sprintf("container <%v> has no explicit tag or digest: <%v>", [container.name, container.image])
+        }
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          tag := input.parameters.tags[_]
+          endswith(image_ref(container.image), concat("", [":", tag]))
+          msg := sprintf("container <%v> uses disallowed tag <%v>", [container.name, tag])
+        }
+
+        # Last path segment, so registry.local:5000/app is not read as tagged.
+        image_ref(image) = ref {
+          parts := split(image, "/")
+          ref := parts[count(parts) - 1]
+        }
+
+        has_tag_or_digest(ref) { contains(ref, ":") }
+        has_tag_or_digest(ref) { contains(ref, "@") }
+
+        input_containers[c] { c := input.review.object.spec.containers[_] }
+        input_containers[c] { c := input.review.object.spec.initContainers[_] }

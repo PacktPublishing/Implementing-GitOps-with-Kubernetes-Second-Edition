@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    # Pod Security Admission: the zero-cost baseline under every engine.
+    pod-security.kubernetes.io/enforce: restricted
+    platform.gitops.io/registry-pull: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: team-a-reconciler
+  namespace: team-a
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: team-a-reconciler
+  namespace: team-a
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+  - kind: ServiceAccount
+    name: team-a-reconciler
+    namespace: team-a
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: team-a
+  namespace: team-a
+spec:
+  interval: 5m
+  url: https://github.com/example-org/team-a-apps.git
+  ref:
+    branch: main
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: team-a-apps
+  namespace: team-a
+spec:
+  interval: 10m
+  serviceAccountName: team-a-reconciler   # the whole security boundary
+  sourceRef:
+    kind: GitRepository
+    name: team-a
+  path: ./deploy
+  prune: true
+  targetNamespace: team-a

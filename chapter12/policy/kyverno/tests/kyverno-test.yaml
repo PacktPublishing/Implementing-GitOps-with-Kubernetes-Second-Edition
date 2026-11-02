@@ -1,0 +1,27 @@
+# Run with: kyverno test chapter12/policy/kyverno/tests
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: chapter12-baseline
+policies:
+  - ../policies/base/disallow-latest-tag.yaml
+  - ../policies/base/require-run-as-non-root.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: disallow-latest-tag
+    resources: [good-pod]
+    kind: Pod
+    result: pass
+  - policy: disallow-latest-tag
+    resources: [latest-pod, untagged-pod]
+    kind: Pod
+    result: fail
+  - policy: require-run-as-non-root
+    resources: [good-pod]
+    kind: Pod
+    result: pass
+  - policy: require-run-as-non-root
+    resources: [latest-pod]
+    kind: Pod
+    result: fail

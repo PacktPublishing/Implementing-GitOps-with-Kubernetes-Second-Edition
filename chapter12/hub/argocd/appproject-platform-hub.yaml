@@ -1,0 +1,20 @@
+# The hub manages itself, as the platform-installer service account.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-hub
+  namespace: argocd
+spec:
+  description: The Argo CD hub and its configuration
+  sourceRepos:
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  destinationServiceAccounts:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+      defaultServiceAccount: argocd-impersonation:platform-installer
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

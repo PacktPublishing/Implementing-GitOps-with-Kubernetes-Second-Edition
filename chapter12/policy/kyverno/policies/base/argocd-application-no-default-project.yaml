@@ -1,0 +1,21 @@
+# A policy about the GitOps system itself: no Application may use the
+# permissive 'default' AppProject.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: argocd-application-no-default-project
+  annotations:
+    policies.kyverno.io/title: Prevent the default AppProject
+    policies.kyverno.io/category: Argo CD
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [argoproj.io]
+        apiVersions: [v1alpha1]
+        operations: [CREATE, UPDATE]
+        resources: [applications]
+  validations:
+    - expression: object.spec.project != 'default'
+      message: Applications must use a team AppProject, not 'default'.

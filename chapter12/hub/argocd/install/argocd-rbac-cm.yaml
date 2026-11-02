@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+data:
+  # No implicit role for authenticated users. Access is granted by group only.
+  policy.default: ""
+  scopes: "[groups]"
+  policy.csv: |
+    # Platform administrators
+    p, role:platform-admin, *, *, */*, allow
+    # Read-only for auditors, including pod logs (enforced since Argo CD 3.0)
+    p, role:auditor, applications, get, */*, allow
+    p, role:auditor, projects, get, *, allow
+    p, role:auditor, logs, get, */*, allow
+    # Entra ID group object IDs
+    g, REPLACE_WITH_PLATFORM_ADMINS_GROUP_ID, role:platform-admin
+    g, REPLACE_WITH_AUDITORS_GROUP_ID, role:auditor

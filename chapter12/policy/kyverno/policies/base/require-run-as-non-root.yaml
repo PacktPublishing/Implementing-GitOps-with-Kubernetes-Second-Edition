@@ -1,0 +1,39 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-run-as-non-root
+  annotations:
+    policies.kyverno.io/title: Require runAsNonRoot
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    # Tenant workloads only: platform components pull from their upstream
+    # registries and are governed by the platform project instead.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno, external-secrets, argocd, argocd-impersonation,
+                   flux-system, gatekeeper-system, sealed-secrets]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: podLevel
+      expression: object.spec.?securityContext.?runAsNonRoot.orValue(false)
+  validations:
+    # A container setting wins over the pod setting, as in the kubelet.
+    - expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).all(c,
+          c.?securityContext.?runAsNonRoot.orValue(variables.podLevel))
+      message: Containers must set securityContext.runAsNonRoot to true.

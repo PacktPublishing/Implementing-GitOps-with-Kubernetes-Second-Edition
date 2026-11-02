@@ -1,0 +1,32 @@
+# Kubernetes-native: evaluated in the API server, no webhook, no extra pods.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-privileged-containers
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).all(c,
+          !c.?securityContext.?privileged.orValue(false))
+      message: Privileged containers are not allowed.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-privileged-containers
+spec:
+  policyName: deny-privileged-containers
+  validationActions: [Deny, Audit]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system]

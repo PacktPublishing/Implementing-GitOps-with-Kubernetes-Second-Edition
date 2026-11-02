@@ -1,0 +1,5 @@
+# Development: everything reports, nothing blocks (except the Argo CD rule).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base

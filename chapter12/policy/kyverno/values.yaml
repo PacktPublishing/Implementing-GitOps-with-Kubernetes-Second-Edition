@@ -1,0 +1,17 @@
+kyverno:
+  crds:
+    install: true             # since 1.19 delivered via the kyverno-api sub-chart
+  admissionController:
+    replicas: 3               # the webhook is in every API request path
+  backgroundController:
+    replicas: 2
+  reportsController:
+    replicas: 2
+  cleanupController:
+    replicas: 2
+  features:
+    policyExceptions:
+      enabled: true
+      # Exceptions are only honoured from this namespace, which only the
+      # platform and security teams can write to.
+      namespace: policy-exceptions

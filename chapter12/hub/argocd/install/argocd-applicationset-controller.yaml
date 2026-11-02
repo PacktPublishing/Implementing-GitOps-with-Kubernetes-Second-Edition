@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-applicationset-controller
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-applicationset-controller
+          env:
+            # Federated AWS identity: the projected token below is exchanged
+            # by STS for short-lived credentials of the argocd-hub role.
+            - name: AWS_ROLE_ARN
+              value: REPLACE_WITH_ARGOCD_HUB_ROLE_ARN
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: /var/run/secrets/aws/token
+            - name: AWS_REGION
+              value: eu-central-1
+            - name: AWS_STS_REGIONAL_ENDPOINTS
+              value: regional
+          volumeMounts:
+            - name: aws-token
+              mountPath: /var/run/secrets/aws
+              readOnly: true
+      volumes:
+        - name: aws-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: sts.amazonaws.com
+                  expirationSeconds: 3600
+                  path: token

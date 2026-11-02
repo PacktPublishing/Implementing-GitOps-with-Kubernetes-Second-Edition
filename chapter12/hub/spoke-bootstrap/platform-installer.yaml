@@ -1,0 +1,25 @@
+# The identity the platform-security project syncs as. It is privileged,
+# because installing a policy engine is; the hub's own identity is not.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd-impersonation
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-installer
+  namespace: argocd-impersonation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-platform-installer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: platform-installer
+    namespace: argocd-impersonation

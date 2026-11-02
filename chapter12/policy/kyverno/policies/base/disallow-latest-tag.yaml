@@ -1,0 +1,41 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      The ':latest' tag is mutable. Every container must reference an
+      explicit tag or a digest, and the tag must not be 'latest'.
+spec:
+  validationActions: [Audit]     # overlays switch production to Deny
+  evaluation:
+    background:
+      enabled: true              # also reports on resources already running
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: containers
+      expression: >-
+        object.spec.containers + object.spec.?initContainers.orValue([])
+    # The part after the last '/', so a registry port is not mistaken for a tag.
+    - name: refs
+      expression: >-
+        variables.containers.map(c, c.image.substring(c.image.lastIndexOf('/') + 1))
+  validations:
+    - expression: >-
+        variables.refs.all(r, r.contains(':') || r.contains('@'))
+      message: An image tag or digest is required.
+    - expression: >-
+        variables.refs.all(r, !r.endsWith(':latest'))
+      message: Using a mutable image tag such as 'latest' is not allowed.
