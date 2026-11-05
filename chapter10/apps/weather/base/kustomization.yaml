@@ -1,0 +1,24 @@
+# The weather service as the team owns it: the application, its cache and the
+# rules for how it is released. Nothing here names a cluster, a cloud, an
+# environment or a registry. Environments compose this base with optional
+# components (../components) and set their own values (../envs).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Teach Kustomize the Rollout kind: image, ConfigMap and Service references
+# inside a Rollout are then rewritten exactly as they are for a Deployment.
+configurations:
+  - rollout-transform.yaml
+
+resources:
+  - serviceaccount.yaml
+  - rollout.yaml
+  - services.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - cache.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: weather

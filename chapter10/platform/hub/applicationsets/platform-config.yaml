@@ -1,0 +1,42 @@
+# Cluster-wide configuration that needs the add-ons' CRDs: the GatewayClass
+# every team references. Retries cover the first sync, which may run before
+# Envoy Gateway has registered its CRDs.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-config
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            role: workload
+  template:
+    metadata:
+      name: 'platform-config-{{.name}}'
+      labels:
+        layer: platform
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+        targetRevision: main
+        path: chapter10/platform/config/workload
+      destination:
+        name: '{{.name}}'
+        namespace: envoy-gateway-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - SkipDryRunOnMissingResource=true

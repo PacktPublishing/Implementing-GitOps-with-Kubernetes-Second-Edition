@@ -1,0 +1,12 @@
+# The weather promotion pipeline: dev -> staging -> prod.
+# Kargo watches the registry, turns each new image into Freight, and moves
+# Freight from Stage to Stage by committing to Git. It never talks to a
+# workload cluster: Argo CD does the deploying, exactly as before.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - project.yaml
+  - git-credentials.yaml
+  - warehouse.yaml
+  - promotiontasks.yaml
+  - stages.yaml

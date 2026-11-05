@@ -1,0 +1,4 @@
+# Envoy Gateway 1.9 is built against Gateway API v1.6 and installs its CRDs.
+# The GatewayClass that teams reference lives in platform/config/workload.
+deployment:
+  replicas: 2

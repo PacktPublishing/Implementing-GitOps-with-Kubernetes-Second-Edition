@@ -1,0 +1,17 @@
+# A reproducible load test, versioned next to the service it tests. Run it
+# in any environment namespace:
+#   kubectl apply -k chapter10/ops/load-test -n weather-staging
+#   kubectl logs -f job/weather-load-test -n weather-staging
+# Delete the Job to run it again. It is not part of any Argo CD Application,
+# so it is never synced into production by accident.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - job.yaml
+  - networkpolicy.yaml
+configMapGenerator:
+  - name: weather-load-test
+    files:
+      - script.js
+generatorOptions:
+  disableNameSuffixHash: true

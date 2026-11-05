@@ -1,0 +1,15 @@
+# Every new semantic-version tag of weather-app in ACR becomes a piece of
+# Freight. Kargo reads ACR with its own federated identity (iac/azure); no
+# registry credential is stored anywhere.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: weather-app
+  namespace: weather
+spec:
+  subscriptions:
+    - image:
+        repoURL: REPLACE_WITH_ACR_LOGIN_SERVER/weather-app
+        imageSelectionStrategy: SemVer
+        constraint: ^3.0.0
+        discoveryLimit: 10

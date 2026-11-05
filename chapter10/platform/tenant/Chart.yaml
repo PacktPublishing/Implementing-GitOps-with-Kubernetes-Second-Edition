@@ -1,0 +1,5 @@
+apiVersion: v2
+name: tenant
+description: Guardrails the platform team puts into every application namespace
+type: application
+version: 1.0.0

@@ -1,0 +1,44 @@
+# One tenant namespace per application environment. The environment files
+# the weather team owns (apps/weather/envs/*/env.yaml) say WHERE an
+# environment runs; this ApplicationSet, owned by the platform team, decides
+# WHAT every tenant namespace gets: Pod Security, quota, limits, default-deny
+# networking and access for the team's Entra ID group.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+        revision: main
+        files:
+          - path: chapter10/apps/weather/envs/*/env.yaml
+  template:
+    metadata:
+      name: 'tenant-{{.namespace}}'
+      labels:
+        layer: platform
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+        targetRevision: main
+        path: chapter10/platform/tenant
+        helm:
+          releaseName: tenant
+          valuesObject:
+            namespace: '{{.namespace}}'
+            team: weather
+            tier: '{{.tier}}'
+            teamGroupObjectId: '{{.teamGroupObjectId}}'
+      destination:
+        name: '{{.cluster}}'
+        namespace: '{{.namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

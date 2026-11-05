@@ -1,0 +1,33 @@
+# No bearer token is stored. argocd-k8s-auth exchanges the federated token
+# projected into the Argo CD pods (Entra Workload ID) for a short-lived Entra
+# token, and AKS authorizes it with Azure RBAC (iac/azure/identities.tf).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-aks-ch10-prod
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    role: workload
+    cloud: azure
+    tier: prod
+type: Opaque
+stringData:
+  name: aks-ch10-prod
+  server: REPLACE_WITH_PROD_ENDPOINT
+  config: |
+    {
+      "execProviderConfig": {
+        "command": "argocd-k8s-auth",
+        "args": ["azure"],
+        "env": {
+          "AAD_ENVIRONMENT_NAME": "AzurePublicCloud",
+          "AAD_LOGIN_METHOD": "workloadidentity"
+        },
+        "apiVersion": "client.authentication.k8s.io/v1beta1"
+      },
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "REPLACE_WITH_PROD_CA_DATA"
+      }
+    }

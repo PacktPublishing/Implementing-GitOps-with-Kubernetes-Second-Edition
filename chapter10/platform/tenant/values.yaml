@@ -1,0 +1,19 @@
+# Set per environment by the "tenants" ApplicationSet from env.yaml.
+namespace: ""
+team: ""
+tier: nonprod          # nonprod | prod
+teamGroupObjectId: ""  # Entra ID group of the team
+
+# Quota profiles. The team sees these as hard limits it cannot change: the
+# weather AppProject blacklists ResourceQuota and LimitRange.
+quota:
+  nonprod:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.memory: 12Gi
+    pods: "40"
+  prod:
+    requests.cpu: "12"
+    requests.memory: 24Gi
+    limits.memory: 32Gi
+    pods: "80"

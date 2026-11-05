@@ -1,0 +1,21 @@
+# Recommendation only. The VPA (managed AKS add-on, iac/azure/clusters.tf)
+# observes real usage and publishes suggested requests in its status; it
+# changes nothing. That makes it safe next to an HPA or KEDA that scales on
+# CPU. Read the recommendation with:
+#   kubectl get vpa weather-app -n weather-staging -o jsonpath='{.status.recommendation}'
+# and move the numbers into the Rollout through a pull request.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: weather-app
+spec:
+  targetRef:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: weather-app
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: weather-app
+        controlledResources: ["cpu", "memory"]

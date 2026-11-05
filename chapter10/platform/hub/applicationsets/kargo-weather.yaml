@@ -1,0 +1,30 @@
+# The Kargo project that promotes the weather-app. It lives on the
+# management cluster, next to Argo CD, and only ever changes Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo-weather
+  namespace: argocd
+  labels:
+    layer: platform
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    targetRevision: main
+    path: chapter10/promotion/kargo
+  destination:
+    name: in-cluster
+    namespace: weather
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - SkipDryRunOnMissingResource=true

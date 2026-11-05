@@ -1,0 +1,5 @@
+addon: envoy-gateway
+namespace: envoy-gateway-system
+repoURL: docker.io/envoyproxy
+chart: gateway-helm
+version: v1.9.3

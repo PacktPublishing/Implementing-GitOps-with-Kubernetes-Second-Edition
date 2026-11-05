@@ -1,0 +1,40 @@
+# Owned by the weather team. The contract with the platform is explicit:
+# the team may deploy only into weather-* namespaces, may not create
+# cluster-scoped resources, and may not change the guardrails the platform
+# puts into its namespaces.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: weather
+  namespace: argocd
+spec:
+  description: Weather team - application layer
+  sourceRepos:
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+  destinations:
+    - name: aks-ch10-nonprod
+      namespace: weather-dev
+    - name: aks-ch10-nonprod
+      namespace: weather-staging
+    - name: aks-ch10-prod
+      namespace: weather-prod
+    - name: eks-ch10-prod
+      namespace: weather-prod
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: rbac.authorization.k8s.io
+      kind: "*"
+  # No automated production syncs overnight (22:00-06:00 Zurich time); dev
+  # and staging are unaffected. Manual syncs stay possible for incidents.
+  syncWindows:
+    - kind: deny
+      schedule: "0 22 * * *"
+      duration: 8h
+      timeZone: Europe/Zurich
+      applications:
+        - weather-prod*
+      manualSync: true

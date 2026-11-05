@@ -1,0 +1,9 @@
+# The platform offers one class of public endpoint. Teams create Gateways and
+# HTTPRoutes that reference it (apps/components/public-endpoint); they never
+# install or configure a controller themselves.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: public
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

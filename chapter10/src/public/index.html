@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>weather-app, a real-world GitOps sample</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; max-width: 40rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+    #meta { font-size: .85rem; opacity: .7; margin-bottom: 1.5rem; }
+    form { margin-bottom: 1rem; }
+    pre { background: #8881; padding: 1rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Current weather</h1>
+  <div id="meta">loading&hellip;</div>
+  <form id="f"><input id="city" value="Zurich" aria-label="City"> <button>Get weather</button></form>
+  <div id="cache"></div>
+  <pre id="out"></pre>
+
+  <script>
+    async function meta() {
+      const i = await fetch('/api/info').then(r => r.json()).catch(() => ({}));
+      document.getElementById('meta').textContent =
+        `environment: ${i.environment ?? '?'} | cloud: ${i.cloud ?? '?'} | revision: ${i.revision ?? 'dev'} | provider: ${i.provider ?? '?'}`;
+    }
+    async function weather(e) {
+      if (e) e.preventDefault();
+      const city = document.getElementById('city').value;
+      const r = await fetch('/api/weather?city=' + encodeURIComponent(city));
+      document.getElementById('cache').textContent = 'cache: ' + (r.headers.get('X-Cache') ?? 'n/a');
+      const body = await r.json();
+      document.getElementById('out').textContent = JSON.stringify(
+        body.current ? { city: body.location?.name, temp_c: body.current.temp_c, condition: body.current.condition?.text } : body,
+        null, 2);
+    }
+    document.getElementById('f').addEventListener('submit', weather);
+    meta(); weather();
+  </script>
+</body>
+</html>

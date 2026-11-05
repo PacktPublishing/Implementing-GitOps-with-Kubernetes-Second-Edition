@@ -1,0 +1,19 @@
+# Let's Encrypt staging by default: browsers will warn, but the rate limits
+# are generous. Production overlays switch the server URL.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: REPLACE_WITH_ACME_EMAIL
+    privateKeySecretRef:
+      name: letsencrypt-account
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: weather
+                kind: Gateway
+                sectionName: http

@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: weather
+  annotations:
+    # cert-manager watches this annotation and issues weather-tls for the
+    # HTTPS listener's hostname.
+    cert-manager.io/issuer: letsencrypt
+spec:
+  gatewayClassName: public
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: weather.example.com
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: weather.example.com
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: weather-tls
+      allowedRoutes:
+        namespaces:
+          from: Same

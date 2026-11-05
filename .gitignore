@@ -39,6 +39,9 @@ runtime_settings.properties
 # Generic
 **/secrets
 /secrets
+# Chapter 12 example manifests: templates only, no real values. Keep the rules
+# above for every other location so a stray secrets/ folder is still ignored.
+!chapter12/secrets/
 # Specific
 launchers/demo-e2e/edc-config.properties
 .env
@@ -47,6 +50,8 @@ launchers/demo-e2e/edc-config.properties
 # Logs
 *.log
 test/
+# Chapter 10 sample app tests are part of the example (npm test)
+!chapter10/src/test/
 # OS & Editor Artifacts
 # Visual Studio
 .vs/

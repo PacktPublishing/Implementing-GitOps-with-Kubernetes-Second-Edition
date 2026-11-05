@@ -1,0 +1,21 @@
+# Background analysis: starts with the first traffic shift and runs until the
+# rollout is promoted or aborted.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: weather-app
+spec:
+  strategy:
+    canary:
+      analysis:
+        templates:
+          - templateName: weather-canary-health
+        startingStep: 1
+        args:
+          - name: namespace
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: canary-hash
+            valueFrom:
+              podTemplateHashValue: Latest

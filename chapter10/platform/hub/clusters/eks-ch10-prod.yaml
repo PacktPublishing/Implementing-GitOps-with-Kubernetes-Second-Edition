@@ -1,0 +1,29 @@
+# EKS delta: a second production cluster on AWS. Only the authentication
+# block differs from AKS. The hub's projected token is exchanged with AWS STS
+# for the role created in Chapter 12 (hub/iac), and an EKS access entry maps
+# that role to Kubernetes RBAC. Not included by default; see README.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-eks-ch10-prod
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    role: workload
+    cloud: aws
+    tier: prod
+type: Opaque
+stringData:
+  name: eks-ch10-prod
+  server: REPLACE_WITH_EKS_ENDPOINT
+  config: |
+    {
+      "awsAuthConfig": {
+        "clusterName": "eks-ch10-prod",
+        "roleARN": "REPLACE_WITH_ARGOCD_HUB_ROLE_ARN"
+      },
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "REPLACE_WITH_EKS_CA_DATA"
+      }
+    }

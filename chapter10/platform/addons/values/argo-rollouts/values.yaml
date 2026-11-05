@@ -1,0 +1,14 @@
+controller:
+  replicas: 2
+  # Gateway API traffic router: the controller downloads the plugin binary at
+  # start-up. Pin the version; mirror it internally if egress is restricted.
+  trafficRouterPlugins:
+    - name: argoproj-labs/gatewayAPI
+      location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64
+providerRBAC:
+  providers:
+    gatewayAPI: true
+# The dashboard stays off. Rollouts are inspected with the kubectl plugin or
+# through Argo CD's resource view.
+dashboard:
+  enabled: false

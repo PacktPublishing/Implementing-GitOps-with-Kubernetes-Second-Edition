@@ -1,0 +1,37 @@
+# The same base as dev, staging and prod; only the values differ. No Key
+# Vault, no Gateway, no Prometheus: the app runs on its mock provider and is
+# reached with port-forward.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: weather-local
+
+resources:
+  - namespace.yaml
+  - ../../apps/weather/base
+
+images:
+  - name: weather-app
+    newName: weather-app
+    newTag: local
+
+configMapGenerator:
+  - name: weather-config
+    literals:
+      - APP_ENVIRONMENT=local
+      - CLOUD_PROVIDER=kind
+      - WEATHER_PROVIDER=mock
+      - CACHE_TTL_SECONDS=30
+      - FAULT_ERROR_RATE=0
+
+patches:
+  - target: { kind: Rollout, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/steps
+        value: []
+      - op: add
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never

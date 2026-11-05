@@ -1,0 +1,10 @@
+# Strategic-merge patch applied to the Deployment and the StatefulSet.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placeholder
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"

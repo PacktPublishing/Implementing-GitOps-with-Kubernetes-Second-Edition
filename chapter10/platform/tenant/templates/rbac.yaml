@@ -1,0 +1,40 @@
+# People read; Git writes. The team's Entra ID group can inspect its
+# namespace everywhere and, outside production, port-forward to debug.
+# Nobody but the reconciler applies changes.
+{{- if .Values.teamGroupObjectId }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.team }}-viewer
+  namespace: {{ .Values.namespace }}
+rules:
+  - apiGroups: ["", "apps"]
+    resources: ["pods", "pods/log", "services", "endpoints", "configmaps", "events", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts", "analysisruns", "analysistemplates"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling", "keda.sh"]
+    resources: ["horizontalpodautoscalers", "scaledobjects"]
+    verbs: ["get", "list", "watch"]
+{{- if ne .Values.tier "prod" }}
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.team }}-viewer
+  namespace: {{ .Values.namespace }}
+subjects:
+  # On AKS with Entra ID integration, a group is identified by its object ID.
+  - kind: Group
+    name: {{ .Values.teamGroupObjectId | quote }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: {{ .Values.team }}-viewer
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

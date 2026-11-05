@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: placeholder
+  annotations:
+    # Client ID of id-ch10-argocd-hub (tofu output argocd_hub_client_id).
+    azure.workload.identity/client-id: REPLACE_WITH_ARGOCD_HUB_CLIENT_ID

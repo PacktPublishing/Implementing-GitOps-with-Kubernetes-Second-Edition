@@ -1,0 +1,95 @@
+# A Rollout is a Deployment with a release strategy. The pod template is the
+# Chapter 8 one, unchanged in spirit: non-root, read-only file system, no
+# service-account token, probes, requests and limits.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: weather-app
+  labels:
+    app.kubernetes.io/name: weather-app
+spec:
+  # No replicas field: the HPA (dev, staging) or KEDA (prod) owns the count.
+  # A value in Git would be reverted by Argo CD on every autoscaling event.
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weather-app
+  strategy:
+    canary:
+      stableService: weather-app
+      canaryService: weather-app-canary
+      maxSurge: "25%"
+      maxUnavailable: 0
+      # Without a traffic router the weights are approximated by replica
+      # counts. The public-endpoint component adds Gateway API routing, which
+      # makes them exact.
+      steps:
+        - setWeight: 20
+        - pause: { duration: 2m }
+        - setWeight: 50
+        - pause: { duration: 2m }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: weather-app
+    spec:
+      serviceAccountName: weather-app
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: weather-app
+      containers:
+        - name: weather-app
+          image: weather-app   # placeholder; each environment sets the registry and tag
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            # Per-environment settings (envs/*/kustomization.yaml).
+            - configMapRef:
+                name: weather-config
+            # The provider API key, delivered by External Secrets Operator.
+            # Optional: without it the app falls back to its mock provider.
+            - secretRef:
+                name: weather-api
+                optional: true
+          env:
+            - name: REDIS_URL
+              value: redis://weather-cache:6379
+          resources:
+            requests:
+              cpu: 100m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 2
+            failureThreshold: 15
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

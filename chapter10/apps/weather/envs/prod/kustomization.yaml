@@ -1,0 +1,84 @@
+# prod: promoted by a human-approved pull request (Kargo opens it), released
+# as a canary with automated analysis, scaled by KEDA on request rate.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: weather-prod
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/metrics
+  - ../../components/external-secret
+  - ../../components/public-endpoint
+  - ../../components/canary-analysis
+  - ../../components/keda
+  - ../../components/vpa
+
+images:
+  - name: weather-app
+    newName: REPLACE_WITH_ACR_LOGIN_SERVER/weather-app
+    newTag: 3.0.0
+
+configMapGenerator:
+  - name: weather-config
+    literals:
+      - APP_ENVIRONMENT=prod
+      - CLOUD_PROVIDER=azure
+      - CACHE_TTL_SECONDS=300
+      - FAULT_ERROR_RATE=0
+
+patches:
+  # One hostname per environment for the Gateway listeners and the routes.
+  - target: { kind: Gateway, name: weather }
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/hostname
+        value: weather-prod.REPLACE_WITH_BASE_DOMAIN
+      - op: replace
+        path: /spec/listeners/1/hostname
+        value: weather-prod.REPLACE_WITH_BASE_DOMAIN
+  - target: { kind: HTTPRoute }
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: weather-prod.REPLACE_WITH_BASE_DOMAIN
+  - target: { kind: Rollout, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/trafficRouting/plugins/argoproj-labs~1gatewayAPI/namespace
+        value: weather-prod
+  # This environment's identity and Key Vault secret.
+  - target: { kind: ServiceAccount, name: weather-secrets }
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/azure.workload.identity~1client-id
+        value: REPLACE_WITH_WEATHER_PROD_CLIENT_ID
+  - target: { kind: ExternalSecret, name: weather-api }
+    patch: |-
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: weather-api-key-prod
+  - target: { kind: ScaledObject, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/triggers/0/metadata/query
+        value: sum(rate(http_requests_total{namespace="weather-prod",route="/api/weather"}[2m]))
+  # Trusted certificates in production.
+  - target: { kind: Issuer, name: letsencrypt }
+    patch: |-
+      - op: replace
+        path: /spec/acme/server
+        value: https://acme-v02.api.letsencrypt.org/directory
+  # Smaller first step and a longer bake time where real users are.
+  - target: { kind: Rollout, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/steps
+        value:
+          - setWeight: 10
+          - pause: { duration: 5m }
+          - setWeight: 25
+          - pause: { duration: 5m }
+          - setWeight: 50
+          - pause: { duration: 10m }
