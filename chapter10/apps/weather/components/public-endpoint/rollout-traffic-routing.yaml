@@ -1,0 +1,12 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: weather-app
+spec:
+  strategy:
+    canary:
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: weather
+            namespace: NAMESPACE   # patched per environment

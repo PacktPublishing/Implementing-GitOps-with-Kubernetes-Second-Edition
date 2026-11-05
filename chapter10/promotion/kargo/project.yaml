@@ -1,0 +1,23 @@
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: weather          # Kargo creates (and owns) a namespace of this name
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+# dev and staging promote themselves as soon as Freight qualifies; prod
+# never does. A person starts a production promotion, and another person
+# approves the pull request it opens.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: weather
+  namespace: weather
+spec:
+  promotionPolicies:
+    - stageSelector:
+        name: dev
+      autoPromotionEnabled: true
+    - stageSelector:
+        name: staging
+      autoPromotionEnabled: true

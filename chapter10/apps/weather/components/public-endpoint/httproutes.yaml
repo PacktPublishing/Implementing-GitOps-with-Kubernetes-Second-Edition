@@ -1,0 +1,43 @@
+# Argo Rollouts owns the two weights below during a canary; Argo CD ignores
+# them (platform/hub/install/argocd-cm.yaml).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: weather
+spec:
+  parentRefs:
+    - name: weather
+      sectionName: https
+  hostnames:
+    - weather.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: weather-app
+          port: 80
+          weight: 100
+        - name: weather-app-canary
+          port: 80
+          weight: 0
+---
+# Plain HTTP only redirects. The ACME challenge route that cert-manager adds
+# is more specific (/.well-known/acme-challenge/...) and therefore wins.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: weather-redirect
+spec:
+  parentRefs:
+    - name: weather
+      sectionName: http
+  hostnames:
+    - weather.example.com
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

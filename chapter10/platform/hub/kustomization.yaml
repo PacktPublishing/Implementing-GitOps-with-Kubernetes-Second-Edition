@@ -1,0 +1,13 @@
+# The Argo CD hub on the management cluster. After the one-time bootstrap
+# (README step 2) the hub reconciles this directory itself: every change to
+# the platform, including Argo CD's own configuration, is a pull request.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - install
+  - clusters
+  - projects
+  - repositories
+  - applicationsets
+  - argocd-hub.yaml

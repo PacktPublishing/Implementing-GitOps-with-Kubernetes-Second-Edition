@@ -1,0 +1,11 @@
+# Node drains (upgrades, autoscaler scale-down) may evict at most one pod at
+# a time, so voluntary disruption never takes the service below capacity.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: weather-app
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weather-app

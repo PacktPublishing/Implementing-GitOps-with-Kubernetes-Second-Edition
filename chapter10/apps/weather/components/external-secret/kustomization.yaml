@@ -1,0 +1,9 @@
+# The provider API key, read from Azure Key Vault by External Secrets
+# Operator with this namespace's own federated identity. Each environment
+# patches the identity client ID and the Key Vault secret name.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - serviceaccount.yaml
+  - secretstore.yaml
+  - externalsecret.yaml

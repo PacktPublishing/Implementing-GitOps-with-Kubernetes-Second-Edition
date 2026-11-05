@@ -1,0 +1,19 @@
+# Minimal metrics stack for Chapter 10: Prometheus for the HPA/KEDA and canary
+# analysis queries. Dashboards, alerting and long-term storage are the subject
+# of Chapter 11, which extends this release rather than replacing it.
+fullnameOverride: prometheus-stack
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    # Discover ServiceMonitors in every namespace, not only those carrying the
+    # Helm release label.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    retention: 2d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi

@@ -1,0 +1,7 @@
+# Public OCI Helm registries must be declared so that the repo server
+# fetches charts from them over OCI. No credentials are needed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - oci-envoyproxy.yaml
+  - oci-kargo.yaml

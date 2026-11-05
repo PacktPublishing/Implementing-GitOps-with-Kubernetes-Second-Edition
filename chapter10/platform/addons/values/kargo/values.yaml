@@ -1,0 +1,17 @@
+api:
+  # Created once at bootstrap (README step 2.3); never stored in Git.
+  secret:
+    name: kargo-api-admin
+  argocd:
+    urls:
+      "": https://localhost:8080
+controller:
+  argocd:
+    namespace: argocd
+  # Ambient Entra Workload ID: Kargo lists image tags in ACR without a
+  # registry credential (iac/azure/identities.tf, id-ch10-kargo).
+  podLabels:
+    azure.workload.identity/use: "true"
+  serviceAccount:
+    annotations:
+      azure.workload.identity/client-id: REPLACE_WITH_KARGO_CLIENT_ID

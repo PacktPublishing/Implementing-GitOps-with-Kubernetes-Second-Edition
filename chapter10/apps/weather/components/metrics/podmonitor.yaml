@@ -1,0 +1,18 @@
+# Scrape the pods, not the Services: the stable and canary Services select the
+# same pods, and scraping both would double every series. The pod-template
+# hash label is what lets the canary analysis compare one ReplicaSet with the
+# other.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: weather-app
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weather-app
+  podTargetLabels:
+    - rollouts-pod-template-hash
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

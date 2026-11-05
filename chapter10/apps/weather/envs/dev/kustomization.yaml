@@ -1,0 +1,72 @@
+# dev: every merged change lands here automatically (Kargo auto-promotion).
+# No canary analysis: the point of dev is fast feedback.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: weather-dev
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/metrics
+  - ../../components/external-secret
+  - ../../components/public-endpoint
+  - ../../components/hpa
+
+# Kargo rewrites newTag on promotion (promotion/kargo). Edit by hand only to
+# bootstrap the first version.
+images:
+  - name: weather-app
+    newName: REPLACE_WITH_ACR_LOGIN_SERVER/weather-app
+    newTag: 3.0.0
+
+configMapGenerator:
+  - name: weather-config
+    literals:
+      - APP_ENVIRONMENT=dev
+      - CLOUD_PROVIDER=azure
+      - CACHE_TTL_SECONDS=60
+      - FAULT_ERROR_RATE=0
+
+patches:
+  # One hostname per environment for the Gateway listeners and the routes.
+  - target: { kind: Gateway, name: weather }
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/hostname
+        value: weather-dev.REPLACE_WITH_BASE_DOMAIN
+      - op: replace
+        path: /spec/listeners/1/hostname
+        value: weather-dev.REPLACE_WITH_BASE_DOMAIN
+  - target: { kind: HTTPRoute }
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: weather-dev.REPLACE_WITH_BASE_DOMAIN
+  - target: { kind: Rollout, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/trafficRouting/plugins/argoproj-labs~1gatewayAPI/namespace
+        value: weather-dev
+  # This environment's identity and Key Vault secret.
+  - target: { kind: ServiceAccount, name: weather-secrets }
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/azure.workload.identity~1client-id
+        value: REPLACE_WITH_WEATHER_DEV_CLIENT_ID
+  - target: { kind: ExternalSecret, name: weather-api }
+    patch: |-
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: weather-api-key-dev
+  # Release immediately: no pauses in dev.
+  - target: { kind: Rollout, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/steps
+        value: []
+  - target: { kind: HorizontalPodAutoscaler, name: weather-app }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1

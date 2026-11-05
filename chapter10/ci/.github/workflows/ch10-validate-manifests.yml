@@ -1,0 +1,62 @@
+name: ch10-validate-manifests
+
+# Pull-request gate for everything Argo CD and Kargo will read. It renders
+# every environment exactly as Argo CD will and validates the result, so a
+# broken overlay fails here instead of in a sync. Copy to .github/workflows/.
+
+on:
+  pull_request:
+    paths:
+      - 'chapter10/apps/**'
+      - 'chapter10/platform/**'
+      - 'chapter10/promotion/**'
+
+permissions:
+  contents: read
+
+env:
+  KUSTOMIZE_VERSION: v5.8.3
+  KUBECONFORM_VERSION: v0.8.0
+  KUBERNETES_VERSION: 1.36.0
+
+jobs:
+  render-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install kustomize and kubeconform
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | tar xz -C /usr/local/bin kustomize
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar xz -C /usr/local/bin kubeconform
+
+      - name: The base stays environment-neutral
+        run: |
+          if grep -rniE 'azurecr\.io|amazonaws\.com|weather-(dev|staging|prod)' chapter10/apps/weather/base/; then
+            echo "::error::environment-specific value found in the base"; exit 1
+          fi
+
+      - name: Render and validate every environment
+        run: |
+          set -euo pipefail
+          for env in chapter10/apps/weather/envs/*/; do
+            echo "::group::$env"
+            kustomize build "$env" | kubeconform -strict -summary \
+              -kubernetes-version "$KUBERNETES_VERSION" \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -ignore-missing-schemas
+            echo "::endgroup::"
+          done
+
+      - name: Validate the platform and promotion definitions
+        run: |
+          set -euo pipefail
+          for dir in chapter10/platform/hub/clusters chapter10/platform/hub/projects \
+                     chapter10/platform/hub/applicationsets chapter10/platform/config/workload \
+                     chapter10/promotion/kargo; do
+            kustomize build "$dir" | kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -ignore-missing-schemas
+          done

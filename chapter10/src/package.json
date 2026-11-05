@@ -1,0 +1,20 @@
+{
+  "name": "weather-app",
+  "version": "3.0.0",
+  "description": "Chapter 10 sample: the Chapter 8 weather-app with a real provider, a Redis cache and Prometheus metrics",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@prometheus-io/client": "^0.16.1",
+    "express": "^5.1.0",
+    "redis": "^6.3.0"
+  },
+  "license": "MIT"
+}

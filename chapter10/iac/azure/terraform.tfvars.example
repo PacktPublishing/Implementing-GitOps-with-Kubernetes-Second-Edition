@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and adjust. Never commit the copy.
+# subscription_id   = "00000000-0000-0000-0000-000000000000"
+location            = "switzerlandnorth"
+resource_group_name = "gitops-ch10-rg"
+kubernetes_version  = "1.36"
+# Point this at your fork, or the CI identity will not trust your workflow.
+github_repository = "PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition"

@@ -1,0 +1,110 @@
+# Two reusable promotion recipes. Both change exactly one line in Git, the
+# image tag in apps/weather/envs/<stage>/kustomization.yaml, and then ask
+# Argo CD to sync the matching Application. They differ only in how the
+# change reaches main.
+#
+# Note: kustomize-set-image rewrites the kustomization file and may drop
+# comments, as `kustomize edit set image` does.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: PromotionTask
+metadata:
+  name: promote-direct
+  namespace: weather
+spec:
+  vars:
+    - name: gitRepo
+      value: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    - name: imageRepo
+      value: REPLACE_WITH_ACR_LOGIN_SERVER/weather-app
+  steps:
+    - uses: git-clone
+      config:
+        repoURL: ${{ vars.gitRepo }}
+        checkout:
+          - branch: main
+            path: ./repo
+    - uses: kustomize-set-image
+      as: set-image
+      config:
+        path: ./repo/chapter10/apps/weather/envs/${{ ctx.stage }}
+        images:
+          - image: weather-app
+            newName: ${{ vars.imageRepo }}
+            tag: ${{ imageFrom(vars.imageRepo).Tag }}
+    - uses: git-commit
+      as: commit
+      config:
+        path: ./repo
+        message: ${{ task.outputs['set-image'].commitMessage }}
+    - uses: git-push
+      as: push
+      config:
+        path: ./repo
+        targetBranch: main
+    - uses: argocd-update
+      config:
+        apps:
+          - name: weather-${{ ctx.stage }}
+            sources:
+              - repoURL: ${{ vars.gitRepo }}
+                desiredRevision: ${{ task.outputs.commit.commit }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: PromotionTask
+metadata:
+  name: promote-via-pull-request
+  namespace: weather
+spec:
+  vars:
+    - name: gitRepo
+      value: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    - name: imageRepo
+      value: REPLACE_WITH_ACR_LOGIN_SERVER/weather-app
+  steps:
+    - uses: git-clone
+      config:
+        repoURL: ${{ vars.gitRepo }}
+        checkout:
+          - branch: main
+            path: ./repo
+    - uses: kustomize-set-image
+      as: set-image
+      config:
+        path: ./repo/chapter10/apps/weather/envs/${{ ctx.stage }}
+        images:
+          - image: weather-app
+            newName: ${{ vars.imageRepo }}
+            tag: ${{ imageFrom(vars.imageRepo).Tag }}
+    - uses: git-commit
+      config:
+        path: ./repo
+        message: ${{ task.outputs['set-image'].commitMessage }}
+    # A new branch per promotion, a pull request against main, and a wait
+    # that ends only when a reviewer merges it (or after 48 hours).
+    - uses: git-push
+      as: push
+      config:
+        path: ./repo
+        generateTargetBranch: true
+    - uses: git-open-pr
+      as: open-pr
+      config:
+        repoURL: ${{ vars.gitRepo }}
+        sourceBranch: ${{ task.outputs.push.branch }}
+        targetBranch: main
+        title: "Promote weather-app ${{ imageFrom(vars.imageRepo).Tag }} to ${{ ctx.stage }}"
+        labels: ["promotion", "${{ ctx.stage }}"]
+    - uses: git-wait-for-pr
+      as: wait-for-pr
+      retry:
+        timeout: 48h
+      config:
+        repoURL: ${{ vars.gitRepo }}
+        prNumber: ${{ task.outputs['open-pr'].pr.id }}
+    - uses: argocd-update
+      config:
+        apps:
+          - name: weather-${{ ctx.stage }}
+            sources:
+              - repoURL: ${{ vars.gitRepo }}
+                desiredRevision: ${{ task.outputs['wait-for-pr'].commit }}

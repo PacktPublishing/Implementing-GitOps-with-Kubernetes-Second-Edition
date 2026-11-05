@@ -1,0 +1,11 @@
+crds:
+  enabled: true
+  keep: true
+config:
+  apiVersion: controller.config.cert-manager.io/v1alpha1
+  kind: ControllerConfiguration
+  # Issue certificates for Gateway listeners (cert-manager.io/issuer annotation).
+  # The Gateway API CRDs must exist when cert-manager starts; see README
+  # troubleshooting if cert-manager was synced before Envoy Gateway.
+  gatewayAPI:
+    enabled: true

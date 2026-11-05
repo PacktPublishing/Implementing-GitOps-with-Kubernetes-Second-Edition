@@ -1,0 +1,5 @@
+addon: kargo
+namespace: kargo
+repoURL: ghcr.io/akuity/kargo-charts
+chart: kargo
+version: 1.12.5

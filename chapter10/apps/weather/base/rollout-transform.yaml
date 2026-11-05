@@ -1,0 +1,29 @@
+# Subset of the Kustomize transformer configuration published by the Argo
+# Rollouts project (docs/features/kustomize/rollout-transform.yaml), limited
+# to the references this chapter uses.
+images:
+  - path: spec/template/spec/containers[]/image
+    kind: Rollout
+nameReference:
+  - kind: ConfigMap
+    version: v1
+    fieldSpecs:
+      - path: spec/template/spec/containers/envFrom/configMapRef/name
+        kind: Rollout
+  - kind: Secret
+    version: v1
+    fieldSpecs:
+      - path: spec/template/spec/containers/envFrom/secretRef/name
+        kind: Rollout
+  - kind: Service
+    version: v1
+    fieldSpecs:
+      - path: spec/strategy/canary/canaryService
+        kind: Rollout
+      - path: spec/strategy/canary/stableService
+        kind: Rollout
+  - kind: ServiceAccount
+    version: v1
+    fieldSpecs:
+      - path: spec/template/spec/serviceAccountName
+        kind: Rollout

@@ -1,0 +1,36 @@
+# Envoy Gateway runs its proxies in envoy-gateway-system. Allow them to reach
+# the application and the short-lived ACME HTTP-01 solver pods, and nothing
+# else in this namespace (Redis in particular stays unreachable).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-app
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: weather-app
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-acme-solver
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - { protocol: TCP, port: 8089 }

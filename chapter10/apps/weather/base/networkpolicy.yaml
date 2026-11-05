@@ -1,0 +1,51 @@
+# The platform denies everything by default (platform/tenant). The team
+# opens exactly the paths its service needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: weather-app
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: weather-app
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # In-namespace load generator (ops/load-test).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: load-generator
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: weather-cache
+      ports:
+        - { protocol: TCP, port: 6379 }
+    # The weather provider: HTTPS to the internet, never to private ranges.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: weather-cache
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: weather-cache
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: weather-app
+      ports:
+        - { protocol: TCP, port: 6379 }
+  egress: []

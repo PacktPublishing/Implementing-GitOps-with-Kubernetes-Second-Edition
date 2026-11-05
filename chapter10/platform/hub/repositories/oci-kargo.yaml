@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-oci-kargo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: kargo-charts
+  url: ghcr.io/akuity/kargo-charts
+  enableOCI: "true"

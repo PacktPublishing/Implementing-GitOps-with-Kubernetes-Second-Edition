@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+data:
+  # A distinct installation ID keeps this hub's tracking annotations apart
+  # from any other Argo CD instance that manages the same clusters.
+  installationID: gitops-ch10-hub
+  # Track resources by annotation, not by label: labels are shared with
+  # Helm and Kustomize and are too easy to overwrite.
+  application.resourceTrackingMethod: annotation
+  # Argo Rollouts' plugin rewrites HTTPRoute weights during a canary. Without
+  # this, Argo CD would see drift and "fix" the traffic split back to 100/0.
+  resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
+    jqPathExpressions:
+      - .spec.rules[].backendRefs[].weight
+  # Defence in depth: never fight an autoscaler over a Rollout's replica count.
+  resource.customizations.ignoreDifferences.argoproj.io_Rollout: |
+    jsonPointers:
+      - /spec/replicas
+  # Local admin stays enabled only until single sign-on is configured
+  # (Chapter 12). Retrieve the initial password once, then delete the secret.
+  admin.enabled: "true"
+  users.anonymous.enabled: "false"
+  timeout.reconciliation: 180s

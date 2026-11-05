@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: {{ .Values.namespace }}
+spec:
+  hard:
+    {{- toYaml (index .Values.quota .Values.tier) | nindent 4 }}
+---
+# Defaults for any container that does not declare its own requests and
+# limits, so the quota above can be enforced without breaking deployments.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-defaults
+  namespace: {{ .Values.namespace }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        memory: 256Mi
+      max:
+        memory: 2Gi

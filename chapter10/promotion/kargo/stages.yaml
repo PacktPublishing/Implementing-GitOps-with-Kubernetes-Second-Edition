@@ -1,0 +1,56 @@
+# The pipeline is the Stages' requestedFreight: dev takes Freight straight
+# from the Warehouse, staging only Freight that dev has verified, prod only
+# Freight that staging has verified. A version cannot skip an environment.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: weather
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: weather-app
+      sources:
+        direct: true
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote-direct
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: staging
+  namespace: weather
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: weather-app
+      sources:
+        stages: [dev]
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote-direct
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: weather
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: weather-app
+      sources:
+        stages: [staging]
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote-via-pull-request

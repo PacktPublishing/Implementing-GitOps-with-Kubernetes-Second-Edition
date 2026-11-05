@@ -1,0 +1,15 @@
+# Five ApplicationSets and one Application describe the whole estate:
+#   addons-*         platform layer: what every cluster of a role runs
+#   platform-config  cluster-wide configuration that depends on the add-ons
+#   tenants          guardrails the platform puts into each team namespace
+#   weather          the application layer, one Application per environment
+#   kargo-weather    the promotion pipeline (management cluster only)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - addons-workload.yaml
+  - addons-management.yaml
+  - platform-config.yaml
+  - tenants.yaml
+  - weather.yaml
+  - kargo-weather.yaml

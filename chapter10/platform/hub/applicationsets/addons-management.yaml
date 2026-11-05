@@ -1,0 +1,60 @@
+# Every add-on file in platform/addons/management x every cluster labelled
+# role=management. The chart comes from its upstream repository at the pinned
+# version; the values come from this Git repository ($values).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addons-management
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  role: management
+          - git:
+              repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+              revision: main
+              files:
+                - path: chapter10/platform/addons/management/*.yaml
+  template:
+    metadata:
+      name: '{{.addon}}-{{.name}}'
+      labels:
+        layer: platform
+        addon: '{{.addon}}'
+    spec:
+      project: platform
+      sources:
+        - repoURL: '{{.repoURL}}'
+          chart: '{{.chart}}'
+          targetRevision: '{{.version}}'
+          helm:
+            releaseName: '{{.addon}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/chapter10/platform/addons/values/{{.addon}}/values.yaml
+              - $values/chapter10/platform/addons/values/{{.addon}}/values-{{index .metadata.labels "cloud"}}.yaml
+        - repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: '{{.name}}'
+        namespace: '{{.namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -1,0 +1,13 @@
+# Cluster registration is declarative: a labelled Secret per cluster.
+# The labels are the contract the ApplicationSets select on.
+#   role: management | workload   -> which platform add-ons a cluster gets
+#   cloud: azure | aws            -> which provider-specific values apply
+#   tier: nonprod | prod          -> which guardrail profile applies
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - in-cluster.yaml
+  - aks-ch10-nonprod.yaml
+  - aks-ch10-prod.yaml
+  # EKS delta (README, "Adding an EKS production cluster"):
+  # - eks-ch10-prod.yaml

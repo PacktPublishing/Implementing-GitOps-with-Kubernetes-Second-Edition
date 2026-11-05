@@ -1,0 +1,23 @@
+# Self-management: the hub reconciles the directory it was bootstrapped from.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-hub
+  namespace: argocd
+  labels:
+    layer: platform
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    targetRevision: main
+    path: chapter10/platform/hub
+  destination:
+    name: in-cluster
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false        # a bad commit must never delete the hub itself
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

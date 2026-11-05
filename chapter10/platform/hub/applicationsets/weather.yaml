@@ -1,0 +1,51 @@
+# The application layer: one Application per environment file. Adding an
+# environment is adding a directory with an env.yaml; the platform does the
+# rest. The kargo.akuity.io/authorized-stage annotation lets exactly one Kargo
+# Stage drive each Application.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: weather
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+        revision: main
+        files:
+          - path: chapter10/apps/weather/envs/*/env.yaml
+  template:
+    metadata:
+      name: 'weather-{{.env}}'
+      labels:
+        layer: application
+        team: weather
+        env: '{{.env}}'
+      annotations:
+        kargo.akuity.io/authorized-stage: 'weather:{{.env}}'
+    spec:
+      project: weather
+      source:
+        repoURL: https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+        targetRevision: main
+        path: 'chapter10/apps/weather/envs/{{.env}}'
+      destination:
+        name: '{{.cluster}}'
+        namespace: '{{.namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # The first sync can race the add-ons' CRDs and the tenant namespace.
+        retry:
+          limit: 10
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+          - SkipDryRunOnMissingResource=true

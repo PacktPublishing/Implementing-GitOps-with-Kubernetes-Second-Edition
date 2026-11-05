@@ -1,0 +1,10 @@
+installCRDs: true
+# The controller holds no cloud identity. Every SecretStore names a service
+# account in its own namespace that is federated with a narrowly scoped
+# identity (iac/azure/identities.tf). Chapter 12 explains the pattern.
+processClusterStore: false
+processPushSecret: false
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi

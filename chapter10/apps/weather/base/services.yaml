@@ -1,0 +1,29 @@
+# Two Services over the same pods. During a canary, Argo Rollouts points the
+# selector of each one at a different ReplicaSet (by pod-template hash).
+apiVersion: v1
+kind: Service
+metadata:
+  name: weather-app
+  labels:
+    app.kubernetes.io/name: weather-app
+spec:
+  selector:
+    app.kubernetes.io/name: weather-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weather-app-canary
+  labels:
+    app.kubernetes.io/name: weather-app
+spec:
+  selector:
+    app.kubernetes.io/name: weather-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

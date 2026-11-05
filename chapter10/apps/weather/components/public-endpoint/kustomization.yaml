@@ -1,0 +1,15 @@
+# The platform's golden path for a public HTTPS endpoint. A team adds this
+# component and patches one value, the hostname; the platform supplies the
+# GatewayClass, the certificate automation and the traffic router.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - issuer.yaml
+  - gateway.yaml
+  - httproutes.yaml
+  - networkpolicy.yaml
+patches:
+  - path: rollout-traffic-routing.yaml
+    target:
+      kind: Rollout
+      name: weather-app

@@ -1,0 +1,36 @@
+# The release gate: the canary's own error rate and latency, measured by
+# Prometheus while it takes real traffic (probe requests excluded). A second
+# failed measurement aborts the rollout and shifts all traffic back to stable.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: weather-canary-health
+spec:
+  args:
+    - name: namespace
+    - name: canary-hash
+  metrics:
+    - name: error-rate
+      interval: 1m
+      failureLimit: 1
+      successCondition: result[0] <= 0.05
+      provider:
+        prometheus:
+          address: http://prometheus-stack-prometheus.monitoring.svc:9090
+          query: |
+            (
+              sum(rate(http_requests_total{namespace="{{args.namespace}}",rollouts_pod_template_hash="{{args.canary-hash}}",route="/api/weather",code=~"5.."}[2m]))
+              /
+              clamp_min(sum(rate(http_requests_total{namespace="{{args.namespace}}",rollouts_pod_template_hash="{{args.canary-hash}}",route="/api/weather"}[2m])), 1e-9)
+            ) or on() vector(0)
+    - name: p95-latency
+      interval: 1m
+      failureLimit: 1
+      successCondition: result[0] <= 0.5
+      provider:
+        prometheus:
+          address: http://prometheus-stack-prometheus.monitoring.svc:9090
+          query: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{namespace="{{args.namespace}}",rollouts_pod_template_hash="{{args.canary-hash}}",route="/api/weather"}[2m]))
+            ) or on() vector(0)

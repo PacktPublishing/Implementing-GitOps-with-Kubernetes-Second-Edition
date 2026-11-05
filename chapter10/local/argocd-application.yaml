@@ -1,0 +1,23 @@
+# The GitOps loop on a laptop: the local Argo CD follows your feature branch,
+# so you test the same render-and-sync path the platform uses, before you
+# open a pull request. bootstrap.sh fills in the two placeholders.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: weather-local
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: REPLACE_WITH_YOUR_FORK
+    targetRevision: REPLACE_WITH_YOUR_BRANCH
+    path: chapter10/local/overlay
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: weather-local
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

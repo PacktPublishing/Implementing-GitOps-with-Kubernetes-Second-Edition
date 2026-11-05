@@ -1,0 +1,16 @@
+# The management cluster itself. No credentials: in-cluster uses the
+# application controller's own service account.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-in-cluster
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    role: management
+    cloud: azure
+    tier: prod
+type: Opaque
+stringData:
+  name: in-cluster
+  server: https://kubernetes.default.svc

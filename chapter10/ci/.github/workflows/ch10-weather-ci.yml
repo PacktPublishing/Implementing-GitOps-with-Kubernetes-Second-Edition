@@ -1,0 +1,138 @@
+name: ch10-weather-ci
+
+# Continuous integration for the weather-app, and nothing else. The workflow
+# tests, builds, scans, signs and publishes an image. It holds no cluster
+# credentials and does not edit manifests: Kargo notices the new tag in the
+# registry and promotes it through Git (promotion/kargo).
+#
+# Copy this file to .github/workflows/ at the repository root to activate it.
+# Action versions are pinned to a major tag for readability. In your own fork
+# pin each one to a full commit SHA (see the Trivy note in the chapter), e.g.
+#   gh api repos/aquasecurity/trivy-action/git/ref/tags/v0.36.0 --jq .object.sha
+
+on:
+  pull_request:
+    paths:
+      - 'chapter10/src/**'
+      - '.github/workflows/ch10-weather-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'chapter10/src/**'
+      - '.github/workflows/ch10-weather-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: weather-app
+  APP_DIR: chapter10/src
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ env.APP_DIR }}
+      - run: npm test
+        working-directory: ${{ env.APP_DIR }}
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # OIDC to Entra ID (push to main only) and keyless signing
+    steps:
+      - uses: actions/checkout@v7
+
+      # Semantic version for Kargo's Warehouse (constraint ^3.0.0).
+      - name: Derive version
+        id: meta
+        run: echo "version=3.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Pull-request gate: build into the local engine and scan before anyone
+      # reviews the change.
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.APP_DIR }}
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          build-args: APP_REVISION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan for vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # Everything below runs only for main. Pull requests never authenticate.
+      - name: Azure login (OIDC)
+        if: github.ref == 'refs/heads/main'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        if: github.ref == 'refs/heads/main'
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      # Publish in two steps so that the released tag is exactly the digest
+      # that was scanned. The candidate repository is never watched by Kargo.
+      - name: Push candidate
+        id: push
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.APP_DIR }}
+          push: true
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}-candidate:${{ steps.meta.outputs.version }}
+          build-args: APP_REVISION=${{ steps.meta.outputs.version }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+
+      - name: Scan the candidate digest
+        if: github.ref == 'refs/heads/main'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}-candidate@${{ steps.push.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # Same digest, release tag: a manifest copy inside the registry, no rebuild.
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" \
+            "${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}-candidate@${{ steps.push.outputs.digest }}"
+
+      - uses: sigstore/cosign-installer@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          cosign-release: v3.1.4
+
+      # Keyless: the signature binds the image digest to this workflow's OIDC
+      # identity. Admission policies (Chapter 12) can then refuse anything
+      # this workflow did not build.
+      - name: Sign
+        if: github.ref == 'refs/heads/main'
+        run: cosign sign --yes "${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"

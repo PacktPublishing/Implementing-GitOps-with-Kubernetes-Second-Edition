@@ -1,0 +1,24 @@
+# Owned by the platform team: the hub, add-ons, cluster configuration and
+# tenant guardrails. Cluster-scoped resources are allowed here and only here.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Platform layer - add-ons, cluster configuration, tenant guardrails
+  sourceRepos:
+    - https://github.com/PacktPublishing/Implementing-GitOps-with-Kubernetes-Second-Edition.git
+    - https://charts.jetstack.io
+    - https://charts.external-secrets.io
+    - https://kedacore.github.io/charts
+    - https://argoproj.github.io/argo-helm
+    - https://prometheus-community.github.io/helm-charts
+    - ghcr.io/akuity/kargo-charts
+    - docker.io/envoyproxy
+  destinations:
+    - name: "*"
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
